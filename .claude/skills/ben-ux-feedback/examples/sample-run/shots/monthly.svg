@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 640" width="360" height="640" font-family="sans-serif">
+  <rect width="360" height="640" fill="#FFFFFF"/>
+  <text x="20" y="52" font-size="20" font-weight="700" fill="#191F28">5월 요약</text>
+  <path d="M306 36 h28 l-10 12 v12 l-8 -4 v-8 z" fill="none" stroke="#4E5968" stroke-width="2" stroke-linejoin="round"/>
+  <text x="20" y="104" font-size="12" fill="#6B7684">이번 달 쓴 돈</text>
+  <text x="20" y="144" font-size="30" font-weight="700" fill="#191F28">818,000원</text>
+  <g fill="#C9E2FF">
+    <rect x="28" y="230" width="36" height="60" rx="4"/>
+    <rect x="84" y="200" width="36" height="90" rx="4"/>
+    <rect x="140" y="250" width="36" height="40" rx="4"/>
+    <rect x="196" y="180" width="36" height="110" rx="4"/>
+  </g>
+  <rect x="252" y="214" width="36" height="76" rx="4" fill="#3182F6"/>
+  <line x1="20" y1="290" x2="340" y2="290" stroke="#E5E8EB"/>
+  <g font-size="12" fill="#6B7684" text-anchor="middle">
+    <text x="46" y="310">1주</text><text x="102" y="310">2주</text><text x="158" y="310">3주</text><text x="214" y="310">4주</text><text x="270" y="310">5주</text>
+  </g>
+  <text x="20" y="364" font-size="15" font-weight="700" fill="#191F28">많이 쓴 곳</text>
+  <rect x="20" y="380" width="320" height="52" rx="12" fill="#F9FAFB"/>
+  <text x="36" y="412" font-size="14" fill="#191F28">식비</text>
+  <text x="324" y="412" font-size="14" font-weight="700" fill="#191F28" text-anchor="end">312,000원</text>
+  <rect x="20" y="444" width="320" height="52" rx="12" fill="#F9FAFB"/>
+  <text x="36" y="476" font-size="14" fill="#191F28">교통</text>
+  <text x="324" y="476" font-size="14" font-weight="700" fill="#191F28" text-anchor="end">96,000원</text>
+</svg>

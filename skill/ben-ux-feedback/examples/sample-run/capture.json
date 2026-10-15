@@ -1,0 +1,14 @@
+{
+  "input_type": "image",
+  "source": {"name": "모아가계부 (가상 제품)", "count": 3},
+  "viewport": "360x640",
+  "screens": [
+    {"id": "home", "name": "홈", "shot": "shots/home.svg"},
+    {"id": "add-expense", "name": "지출 입력", "shot": "shots/add-expense.svg"},
+    {"id": "monthly", "name": "월간 요약", "shot": "shots/monthly.svg"}
+  ],
+  "edges": [
+    {"from": "home", "to": "add-expense", "label": "지출 추가 버튼"},
+    {"from": "home", "to": "monthly", "label": "월간 요약 보기"}
+  ]
+}

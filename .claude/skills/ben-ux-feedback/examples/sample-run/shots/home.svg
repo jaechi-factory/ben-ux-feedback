@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 640" width="360" height="640" font-family="sans-serif">
+  <rect width="360" height="640" fill="#FFFFFF"/>
+  <text x="20" y="52" font-size="20" font-weight="700" fill="#191F28">모아가계부</text>
+  <rect x="20" y="76" width="320" height="120" rx="16" fill="#E8F3FF"/>
+  <text x="36" y="108" font-size="10" fill="#8B95A1">이번 달 남은 돈</text>
+  <text x="36" y="150" font-size="30" font-weight="700" fill="#191F28">382,000원</text>
+  <text x="36" y="178" font-size="12" fill="#4E5968">5월 예산 1,200,000원 중</text>
+  <text x="20" y="236" font-size="15" font-weight="700" fill="#191F28">오늘 쓴 돈</text>
+  <rect x="20" y="252" width="320" height="56" rx="12" fill="#F9FAFB"/>
+  <text x="36" y="276" font-size="14" fill="#191F28">커피</text>
+  <text x="36" y="296" font-size="12" fill="#6B7684">오전 9:10</text>
+  <text x="324" y="286" font-size="14" font-weight="700" fill="#191F28" text-anchor="end">-4,500원</text>
+  <rect x="20" y="320" width="320" height="56" rx="12" fill="#F9FAFB"/>
+  <text x="36" y="344" font-size="14" fill="#191F28">점심</text>
+  <text x="36" y="364" font-size="12" fill="#6B7684">낮 12:40</text>
+  <text x="324" y="354" font-size="14" font-weight="700" fill="#191F28" text-anchor="end">-9,000원</text>
+  <rect x="20" y="552" width="320" height="52" rx="14" fill="#1B64DA"/>
+  <text x="180" y="584" font-size="16" font-weight="700" fill="#FFFFFF" text-anchor="middle">지출 추가</text>
+</svg>

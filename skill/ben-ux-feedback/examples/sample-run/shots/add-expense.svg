@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 640" width="360" height="640" font-family="sans-serif">
+  <rect width="360" height="640" fill="#FFFFFF"/>
+  <text x="20" y="52" font-size="20" font-weight="700" fill="#191F28">지출 입력</text>
+  <text x="20" y="96" font-size="12" fill="#6B7684">금액</text>
+  <text x="20" y="136" font-size="30" font-weight="700" fill="#191F28">4,500원</text>
+  <line x1="20" y1="148" x2="340" y2="148" stroke="#3182F6" stroke-width="2"/>
+  <text x="20" y="188" font-size="12" fill="#6B7684">분류</text>
+  <rect x="20" y="200" width="96" height="40" rx="20" fill="#F2F4F6"/>
+  <text x="68" y="225" font-size="14" fill="#191F28" text-anchor="middle">변동비</text>
+  <rect x="124" y="200" width="96" height="40" rx="20" fill="#F2F4F6"/>
+  <text x="172" y="225" font-size="14" fill="#191F28" text-anchor="middle">고정비</text>
+  <rect x="228" y="200" width="96" height="40" rx="20" fill="#F2F4F6"/>
+  <text x="276" y="225" font-size="14" fill="#191F28" text-anchor="middle">저축</text>
+  <rect x="20" y="332" width="100" height="40" rx="12" fill="#F2F4F6"/>
+  <text x="70" y="357" font-size="14" fill="#4E5968" text-anchor="middle">취소</text>
+  <rect x="0" y="400" width="360" height="240" fill="#D1D6DB"/>
+  <g fill="#FFFFFF">
+    <rect x="12" y="412" width="104" height="48" rx="8"/><rect x="128" y="412" width="104" height="48" rx="8"/><rect x="244" y="412" width="104" height="48" rx="8"/>
+    <rect x="12" y="470" width="104" height="48" rx="8"/><rect x="128" y="470" width="104" height="48" rx="8"/><rect x="244" y="470" width="104" height="48" rx="8"/>
+    <rect x="12" y="528" width="104" height="48" rx="8"/><rect x="128" y="528" width="104" height="48" rx="8"/><rect x="244" y="528" width="104" height="48" rx="8"/>
+    <rect x="128" y="586" width="104" height="48" rx="8"/>
+  </g>
+  <g font-size="20" fill="#191F28" text-anchor="middle">
+    <text x="64" y="444">1</text><text x="180" y="444">2</text><text x="296" y="444">3</text>
+    <text x="64" y="502">4</text><text x="180" y="502">5</text><text x="296" y="502">6</text>
+    <text x="64" y="560">7</text><text x="180" y="560">8</text><text x="296" y="560">9</text>
+    <text x="180" y="618">0</text>
+  </g>
+</svg>

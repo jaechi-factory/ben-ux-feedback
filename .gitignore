@@ -1,0 +1,10 @@
+_legacy/
+_work/
+notes.md
+__pycache__/
+*.pyc
+.DS_Store
+runs/
+.ben-ux-feedback-backups/
+skill/ben-ux-feedback/examples/sample-run/report.html
+skill/ben-ux-feedback/examples/sample-run/report.md
