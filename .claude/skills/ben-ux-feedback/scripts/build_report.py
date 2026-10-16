@@ -18,6 +18,9 @@ import os
 import re
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from validate import BRIEF_FIELDS  # noqa: E402  브리프 항목 이름은 검증기와 같은 것을 쓴다
+
 MIME = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
         ".webp": "image/webp", ".gif": "image/gif", ".svg": "image/svg+xml"}
 SEV_ORDER = {"심각": 0, "중간": 1, "낮음": 2}
@@ -833,6 +836,12 @@ def build_html(m, run):
         meta.append(("제품 핵심 가치", esc(m.run.get("product_value"))))
     if t(m.run.get("goal")):
         meta.append(("검토 목표", esc(m.run.get("goal"))))
+    brief = m.run.get("brief") if isinstance(m.run.get("brief"), dict) else {}
+    for k, label in BRIEF_FIELDS:
+        if t(brief.get(k)):
+            meta.append((label, esc(brief.get(k))))
+    if brief.get("source") in ("inferred", "mixed"):
+        meta.append(("맥락 출처", "일부나 전부를 화면에서 추론했어요"))
     meta_html = "".join(f"<div><dt>{k}</dt><dd>{v}</dd></div>" for k, v in meta)
 
     top = []
@@ -1004,6 +1013,12 @@ def build_md(m):
         L.append(f"제품 핵심 가치: {mt(m.run.get('product_value'))}")
     if t(m.run.get("goal")):
         L.append(f"목표: {mt(m.run.get('goal'))}")
+    brief = m.run.get("brief") if isinstance(m.run.get("brief"), dict) else {}
+    for k, label in BRIEF_FIELDS:
+        if t(brief.get(k)):
+            L.append(f"{label}: {mt(brief.get(k))}")
+    if brief.get("source") in ("inferred", "mixed"):
+        L.append("맥락 출처: 일부나 전부를 화면에서 추론했어요")
     ex = [mt(x) for x in strs(m.run.get("exclusions"))]
     if ex:
         L.append("제외 규칙: " + ", ".join(ex))

@@ -36,7 +36,8 @@ SKIP_DIRS = {"__pycache__"}
 SKIP_NAMES = {".DS_Store"}
 SKIP_SUFFIXES = (".pyc",)
 # 예시 run에서 다시 만들 수 있는 리포트는 복사하지 않아요.
-SKIP_RELS = {"examples/sample-run/report.html", "examples/sample-run/report.md"}
+SKIP_RELS = {"examples/sample-run/report.html", "examples/sample-run/report.md",
+             "examples/sample-compare/compare.html"}
 
 # 채팅 지식 파일 안에서 references/ 경로를 채팅 파일 이름으로 바꿔요.
 CHAT_REF = {

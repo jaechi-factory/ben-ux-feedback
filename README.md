@@ -53,6 +53,23 @@ Claude Code에서 가장 편하게 쓰고, Codex와 채팅형 LLM(ChatGPT, Gemin
 
 설치 스크립트는 이미 있는 폴더를 덮어쓰지 않아요. 바꾸려면 `--replace-with-backup`을 붙이면 기존 폴더를 `.ben-ux-feedback-backups/`로 옮긴 뒤 교체해요. 홈 폴더나 루트 같은 위험한 경로와 심볼릭 링크는 거절해요.
 
+## 리뷰 전에 받는 맥락
+
+화면만 보면 "잘 만들었나"까지만 알 수 있어요. 무엇을 풀려고 만든 화면인지 알면 "이 화면이 그 문제를 푸나"까지 판정해요. 그래서 요청에 맥락이 없으면 판정 전에 한 번만 아래 양식을 보여 주고 짧게 써 달라고 해요. 이미 답한 항목은 묻지 않고, "그냥 해줘"라고 하면 화면에서 추론해 바로 진행해요.
+
+```markdown
+## 어떤 제품인가요?
+## 달성하고자 하는 목표가 무엇인가요?
+## 해결하고자 하는 문제는 무엇인가요?
+## 왜 이 문제를 겪고 있을까요?
+## 어떻게 해결하고자 하나요?
+## 이 개선을 통해서 유저가 얻는 기대효과는 무엇인가요?
+## 이 개선을 통해서 회사가 얻는 기대효과는 무엇인가요?
+## 디자인 결과물 링크나 이미지
+```
+
+맥락은 만든 사람의 전제로만 써요. 지적 근거는 언제나 화면이에요.
+
 ## 입력
 
 | 입력 | 방법 |
@@ -78,6 +95,14 @@ python3 skill/ben-ux-feedback/scripts/build_report.py --run skill/ben-ux-feedbac
 ```bash
 python3 skill/ben-ux-feedback/scripts/validate.py --run runs/<이름>
 python3 skill/ben-ux-feedback/scripts/build_report.py --run runs/<이름>
+```
+
+### 시안 비교
+
+같은 화면의 시안 여러 개를 비교하면 `compare.json`(정본)과 `compare.html`이 생겨요. 결론과 순위, 시안 썸네일, 기준별 비교, 공통으로 고칠 것, 시안별 잘한 점과 아쉬운 점, 추천 조합이 한 장에 들어가요. HTML은 고정 틀이라 내용만 쓰면 돼요. 예시는 `skill/ben-ux-feedback/examples/sample-compare/`(가상 가계부 앱 예산 설정 2안)예요.
+
+```bash
+python3 skill/ben-ux-feedback/scripts/build_compare.py --run skill/ben-ux-feedback/examples/sample-compare
 ```
 
 ## 문구 판정
@@ -112,4 +137,4 @@ python3 -m unittest discover -s tests -v
 
 ## English summary
 
-ben-ux-feedback is an MIT-licensed skill that reviews screen designs against a design guideline and returns severity-ranked findings (severe, medium, low), each with evidence and a ready-to-use fix. It can also run a virtual usability walkthrough with three simulated users (young, middle-aged, senior), which is inference from static screens and not real user research, and it builds HTML and Markdown reports. It works with Claude Code (project and user scope), Codex, and chat-based LLMs through the files in `chat/`. The guideline was written independently from Toss's public materials and is not affiliated with or endorsed by Toss; see NOTICE.md. The skill is read-only, and the final decision stays with people. Feedback is written in Korean.
+ben-ux-feedback is an MIT-licensed skill that reviews screen designs against a design guideline and returns severity-ranked findings (severe, medium, low), each with evidence and a ready-to-use fix. It can also run a virtual usability walkthrough with three simulated users (young, middle-aged, senior), which is inference from static screens and not real user research, and it builds HTML and Markdown reports, including a side-by-side comparison report for multiple design variants. It works with Claude Code (project and user scope), Codex, and chat-based LLMs through the files in `chat/`. The guideline was written independently from Toss's public materials and is not affiliated with or endorsed by Toss; see NOTICE.md. The skill is read-only, and the final decision stays with people. Feedback is written in Korean.

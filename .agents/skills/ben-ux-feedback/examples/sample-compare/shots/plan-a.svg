@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 640" width="360" height="640" font-family="sans-serif">
+  <rect width="360" height="640" fill="#FFFFFF"/>
+  <text x="20" y="52" font-size="20" font-weight="700" fill="#191F28">이번 달 예산 정하기</text>
+  <text x="20" y="80" font-size="13" fill="#6B7684">한 달에 쓸 돈을 정하면 남은 돈을 알려드려요.</text>
+  <text x="20" y="128" font-size="12" fill="#6B7684">식비</text>
+  <rect x="20" y="138" width="320" height="44" rx="10" fill="#F2F4F6"/>
+  <text x="36" y="166" font-size="15" fill="#B0B8C1">금액 입력</text>
+  <text x="20" y="214" font-size="12" fill="#6B7684">교통비</text>
+  <rect x="20" y="224" width="320" height="44" rx="10" fill="#F2F4F6"/>
+  <text x="36" y="252" font-size="15" fill="#B0B8C1">금액 입력</text>
+  <text x="20" y="300" font-size="12" fill="#6B7684">생활비</text>
+  <rect x="20" y="310" width="320" height="44" rx="10" fill="#F2F4F6"/>
+  <text x="36" y="338" font-size="15" fill="#B0B8C1">금액 입력</text>
+  <rect x="20" y="568" width="320" height="52" rx="12" fill="#3182F6"/>
+  <text x="180" y="600" font-size="16" font-weight="700" fill="#FFFFFF" text-anchor="middle">저장</text>
+</svg>

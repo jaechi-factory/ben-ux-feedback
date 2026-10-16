@@ -14,13 +14,14 @@
 2. 판정 전에 `references/guideline.md`를 읽고, 필요할 때만 `appendix.md`와 `cases.md`의 해당 부분을 펼쳐요.
 3. 지적마다 수정안을 붙여요. 심각이면 `tobe`(수정 후 모습)가 필수예요. 심각도는 심각, 중간, 낮음 세 가지예요.
 4. 읽기 전용이에요. Figma나 서비스에 쓰지 않아요.
-5. 결과는 `runs/<이름>/review.json`에 쓰고 `validate.py`로 검증한 뒤 `build_report.py`로 리포트를 만들어요.
+5. 결과는 `runs/<이름>/review.json`에 쓰고 `validate.py`로 검증한 뒤 `build_report.py`로 리포트를 만들어요. 같은 화면의 시안 여러 개를 비교할 때는 `compare.json`을 쓰고 `build_compare.py`로 검사와 리포트를 함께 해요.
 
 ```bash
 python3 skill/ben-ux-feedback/scripts/detect_input.py "<이미지|폴더|Figma URL|http(s) URL>"
 python3 skill/ben-ux-feedback/scripts/image_capture.py <파일|폴더> --run runs/<이름>
 python3 skill/ben-ux-feedback/scripts/validate.py --run runs/<이름>
 python3 skill/ben-ux-feedback/scripts/build_report.py --run runs/<이름>
+python3 skill/ben-ux-feedback/scripts/build_compare.py --run runs/<이름>   # 시안 비교
 ```
 
 ## 파일을 고칠 때

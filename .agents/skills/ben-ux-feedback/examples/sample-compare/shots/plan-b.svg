@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 640" width="360" height="640" font-family="sans-serif">
+  <rect width="360" height="640" fill="#FFFFFF"/>
+  <text x="20" y="52" font-size="20" font-weight="700" fill="#191F28">지난달엔 82만원 썼어요</text>
+  <text x="20" y="80" font-size="13" fill="#6B7684">이번 달은 얼마까지 쓸까요?</text>
+  <rect x="20" y="108" width="100" height="40" rx="20" fill="#E8F3FF"/>
+  <text x="70" y="133" font-size="14" font-weight="700" fill="#1B64DA" text-anchor="middle">70만원</text>
+  <rect x="130" y="108" width="100" height="40" rx="20" fill="#3182F6"/>
+  <text x="180" y="133" font-size="14" font-weight="700" fill="#FFFFFF" text-anchor="middle">80만원</text>
+  <rect x="240" y="108" width="100" height="40" rx="20" fill="#E8F3FF"/>
+  <text x="290" y="133" font-size="14" font-weight="700" fill="#1B64DA" text-anchor="middle">90만원</text>
+  <text x="20" y="190" font-size="13" fill="#6B7684">직접 입력</text>
+  <rect x="20" y="568" width="320" height="52" rx="12" fill="#3182F6"/>
+  <text x="180" y="600" font-size="16" font-weight="700" fill="#FFFFFF" text-anchor="middle">80만원으로 정하기</text>
+</svg>

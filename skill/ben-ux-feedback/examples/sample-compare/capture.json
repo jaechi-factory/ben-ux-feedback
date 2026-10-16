@@ -1,0 +1,10 @@
+{
+  "input_type": "image",
+  "source": {"name": "모아가계부 (가상 제품) 예산 설정 시안", "count": 2},
+  "viewport": "360x640",
+  "screens": [
+    {"id": "plan-a", "name": "A안 항목별 입력", "shot": "shots/plan-a.svg"},
+    {"id": "plan-b", "name": "B안 지난달 기준 추천", "shot": "shots/plan-b.svg"}
+  ],
+  "edges": []
+}

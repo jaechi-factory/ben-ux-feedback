@@ -23,6 +23,7 @@ SKILL = os.path.join(ROOT, "skill", "ben-ux-feedback")
 SCRIPTS = os.path.join(SKILL, "scripts")
 sys.path.insert(0, SCRIPTS)
 
+import build_compare  # noqa: E402
 import build_report  # noqa: E402
 import detect_input  # noqa: E402
 import image_capture  # noqa: E402
@@ -43,7 +44,8 @@ def write(path, data=b""):
 def good_review():
     return {
         "run": {"goal": "테스트", "product_value": "지출을 빠르게 기록한다",
-                "input_type": "image", "writing_judge": "ben-ux-writing"},
+                "input_type": "image", "writing_judge": "ben-ux-writing",
+                "brief": {"product": "가계부 앱", "objective": "매일 기록하게 하기", "source": "user"}},
         "screens": [{"id": "home", "name": "홈", "shot": "shots/home.png",
                      "screen_goal": "지출을 기록한다", "verdict": "저장 버튼이 가려져요."}],
         "findings": [{
@@ -985,6 +987,261 @@ class FigmaKeyTest(unittest.TestCase):
         for p in seen:
             self.assertNotIn("AB/../x", p)
             self.assertIn("AB%2F..%2Fx%3Fy", p)
+
+
+class BriefTest(RunCase):
+    def test_missing_brief_warns_and_malformed_brief_fails(self):
+        rev = good_review()
+        del rev["run"]["brief"]
+        errors, warns = self.run_check(rev)
+        self.assertEqual(errors, [])
+        self.assertTrue(any("run.brief가 없어요" in w for w in warns), warns)
+        for bad, needle in (({"product": "앱"}, "source"), ({"source": "user"}, "채운 항목"),
+                            ({"product": 3, "source": "user"}, "문자열"), ({"wish": "x", "source": "user"}, "모르는 키"),
+                            ("앱", "객체")):
+            rev["run"]["brief"] = bad
+            self.assertHasError(self.run_check(rev)[0], needle)
+
+    def test_brief_order_matches_skill_questions(self):
+        keys = [k for k, _ in validate.BRIEF_FIELDS]
+        self.assertEqual(keys, ["product", "objective", "problem", "cause", "solution", "user_value", "business_value"])
+        skill = open(os.path.join(SKILL, "SKILL.md"), encoding="utf-8").read()
+        qs = ["## 어떤 제품인가요?", "## 달성하고자 하는 목표가 무엇인가요?", "## 해결하고자 하는 문제는 무엇인가요?",
+              "## 왜 이 문제를 겪고 있을까요?", "## 어떻게 해결하고자 하나요?",
+              "## 이 개선을 통해서 유저가 얻는 기대효과는 무엇인가요?",
+              "## 이 개선을 통해서 회사가 얻는 기대효과는 무엇인가요?", "## 디자인 결과물 링크나 이미지"]
+        pos = [skill.index(q) for q in qs]
+        self.assertEqual(pos, sorted(pos))
+
+    def test_report_shows_brief_as_premise(self):
+        rev = good_review()
+        rev["run"]["brief"] = {"product": "<b>가계부</b> 앱", "problem": "기록을 안 해요", "source": "mixed"}
+        write(os.path.join(self.run_dir, "review.json"), json.dumps(rev, ensure_ascii=False))
+        with contextlib.redirect_stdout(io.StringIO()):
+            build_report.build(self.run_dir)
+        with open(os.path.join(self.run_dir, "report.html"), encoding="utf-8") as fh:
+            doc = fh.read()
+        with open(os.path.join(self.run_dir, "report.md"), encoding="utf-8") as fh:
+            md = fh.read()
+        self.assertIn("해결하려는 문제", doc)
+        self.assertIn("&lt;b&gt;가계부&lt;/b&gt;", doc)
+        self.assertIn("화면에서 추론했어요", doc)
+        self.assertIn("해결하려는 문제: 기록을 안 해요", md)
+
+
+class CompareTest(unittest.TestCase):
+    SAMPLE = os.path.join(SKILL, "examples", "sample-compare")
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.run_dir = os.path.join(self._tmp.name, "run")
+        shutil.copytree(self.SAMPLE, self.run_dir)
+        with open(os.path.join(self.run_dir, "compare.json"), encoding="utf-8") as fh:
+            self.cmp = json.load(fh)
+        with open(os.path.join(self.run_dir, "capture.json"), encoding="utf-8") as fh:
+            self.cap = json.load(fh)
+        self.principles = validate.load_principles(GUIDELINE)
+        self.cases = validate.load_cases(CASES)
+
+    def result(self, cmp=None, cap="auto"):
+        return build_compare.check(self.cmp if cmp is None else cmp, self.run_dir,
+                                   self.cap if cap == "auto" else cap, self.principles, self.cases)
+
+    def errors(self, cmp=None, cap="auto"):
+        return self.result(cmp, cap)[0]
+
+    def warns(self, cmp=None, cap="auto"):
+        return self.result(cmp, cap)[1]
+
+    def assertHas(self, items, needle):
+        self.assertTrue(any(needle in e for e in items), f"{needle!r} not in {items}")
+
+    def write_cmp(self, cmp):
+        with open(os.path.join(self.run_dir, "compare.json"), "w", encoding="utf-8") as fh:
+            json.dump(cmp, fh, ensure_ascii=False)
+
+    def test_sample_passes_strict_and_builds_self_contained_html(self):
+        self.assertEqual(self.result(), ([], []))
+        with contextlib.redirect_stdout(io.StringIO()):
+            out = build_compare.build(self.run_dir, strict=True)
+        with open(out, encoding="utf-8") as fh:
+            doc = fh.read()
+        self.assertIn("Content-Security-Policy", doc)
+        self.assertNotRegex(doc, r'(src|href)="https?:')
+        self.assertEqual(doc.count("data:image/svg+xml;base64,"), 4)  # 썸네일과 상세에 시안마다 두 번
+        self.assertLess(doc.index("B안 지난달 기준 추천"), doc.index("A안 항목별 입력"))  # 순위 순서
+        for heading in ("한눈에 보기", "기준별로 비교하면", "어느 시안을 고르든 고쳐야 할 것",
+                        "시안별로 아쉬운 점", "가상 사용자 반응", "추천 조합", "화면만으로는 알 수 없는 것"):
+            self.assertIn(heading, doc)
+        self.assertIn("가상 반응", doc)
+        self.assertNotIn("가상 사용자 반응을 돌리지 않았어요", doc)
+
+    def test_check_only_writes_nothing(self):
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertIsNone(build_compare.build(self.run_dir, check_only=True))
+        self.assertFalse(os.path.exists(os.path.join(self.run_dir, "compare.html")))
+
+    def test_text_is_escaped_and_only_bold_and_placeholders_render(self):
+        cmp = copy.deepcopy(self.cmp)
+        cmp["lead"] = "<script>alert(1)</script> **굵게** {자리_표시} **a {b** c}"
+        doc = build_compare.build_html(cmp, self.run_dir)
+        self.assertNotIn("<script>alert", doc)
+        self.assertIn("&lt;script&gt;", doc)
+        self.assertIn("<strong>굵게</strong>", doc)
+        self.assertIn("<code>{자리_표시}</code>", doc)
+        self.assertNotIn("<code>{b</strong>", doc)  # 태그가 엇갈려 중첩되지 않아요
+
+    def test_rank_must_be_unique_and_complete(self):
+        cmp = copy.deepcopy(self.cmp)
+        cmp["variants"][1]["rank"] = 1
+        self.assertHas(self.errors(cmp), "rank는 1부터")
+
+    def test_every_variant_needs_a_cell_per_criterion(self):
+        cmp = copy.deepcopy(self.cmp)
+        del cmp["criteria"][0]["cells"]["plan-a"]
+        self.assertHas(self.errors(cmp), "시안 'plan-a'가 없어요")
+        cmp = copy.deepcopy(self.cmp)
+        cmp["criteria"][0]["cells"]["plan-a"]["level"] = "great"
+        self.assertHas(self.errors(cmp), "level은 good, mid, bad")
+
+    def test_issues_need_severity_fix_and_where(self):
+        cmp = copy.deepcopy(self.cmp)
+        cmp["variants"][0]["cons"][0]["fix"] = ""
+        cmp["variants"][0]["cons"][0]["where"] = ""
+        cmp["common"][0]["severity"] = "P1"
+        errs = self.errors(cmp)
+        self.assertHas(errs, "cons[0].fix가 비었어요")
+        self.assertHas(errs, "cons[0].where가 비었어요")
+        self.assertHas(errs, "common[0].severity")
+
+    def test_severe_issue_follows_single_mode_discipline(self):
+        cmp = copy.deepcopy(self.cmp)
+        con = cmp["variants"][1]["cons"][0]
+        con.update({"severity": "심각", "text": "저장 버튼이 없어요", "fix": "명확히 보여주세요"})
+        con.pop("tobe", None)
+        con.pop("done_when", None)
+        errs, warns = self.result(cmp)
+        self.assertHas(errs, "tobe(수정 후 모습)")
+        self.assertHas(warns, "done_when")
+        self.assertHas(warns, "훑은 흔적")
+        self.assertHas(warns, "fix가 추상적")
+
+    def test_principle_and_case_are_checked_against_references(self):
+        cmp = copy.deepcopy(self.cmp)
+        cmp["variants"][0]["cons"][0]["principle"] = "Make It Pop"
+        self.assertHas(self.errors(cmp), "없는 원칙 이름")
+        cmp = copy.deepcopy(self.cmp)
+        cmp["variants"][0]["cons"][0]["case"] = "C999"
+        self.assertHas(self.errors(cmp), "없는 사례 번호")
+        cmp = copy.deepcopy(self.cmp)
+        cmp["common"][0]["case"] = "C127"
+        self.assertHas(self.errors(cmp), "principle이 비었는데 case")
+
+    def test_exclusion_rules_warn(self):
+        cmp = copy.deepcopy(self.cmp)
+        cmp["exclusions"] = ["dummy-amount-mismatch"]
+        cmp["variants"][1]["cons"][1]["text"] = "두 화면의 금액이 서로 달라요"
+        self.assertHas(self.warns(cmp), "dummy-amount-mismatch")
+
+    def test_ut_structure_and_links(self):
+        cmp = copy.deepcopy(self.cmp)
+        p = cmp["ut"]["personas"][0]
+        p.update({"writing": "막힘", "issue_ids": []})
+        p.pop("cause", None)
+        errs = self.errors(cmp)
+        self.assertHas(errs, "cause가 필요해요")
+        self.assertHas(errs, "issue_ids로 지적에 이어요")
+        cmp = copy.deepcopy(self.cmp)
+        cmp["ut"]["personas"][1]["issue_ids"] = ["NOPE"]
+        cmp["ut"]["personas"][2]["score"] = 3
+        errs = self.errors(cmp)
+        self.assertHas(errs, "'NOPE'")
+        self.assertHas(errs, "수치 필드")
+
+    def test_ut_must_walk_first_variant_and_link_its_own_issues(self):
+        cmp = copy.deepcopy(self.cmp)
+        cmp["ut"]["variant"] = "plan-a"
+        for p in cmp["ut"]["personas"]:
+            p["issue_ids"] = ["C1"] if p["issue_ids"] else []
+        self.assertHas(self.warns(cmp), "1위 시안이 아니에요")
+        cmp = copy.deepcopy(self.cmp)
+        cmp["ut"]["personas"][2]["issue_ids"] = ["A1"]  # 2위 시안의 지적
+        self.assertHas(self.errors(cmp), "ut.variant 시안의 cons나 common")
+
+    def test_brief_renders_folded_premise_and_is_checked(self):
+        doc = build_compare.build_html(self.cmp, self.run_dir)
+        self.assertIn("검토 전제 보기", doc)
+        self.assertIn("작성자가 준 맥락이에요", doc)
+        cmp = copy.deepcopy(self.cmp)
+        del cmp["brief"]
+        self.assertHas(self.warns(cmp), "brief가 없어요")
+        cmp["brief"] = {"source": "user"}
+        self.assertHas(self.errors(cmp), "채운 항목")
+
+    def test_bold_can_wrap_placeholder(self):
+        cmp = copy.deepcopy(self.cmp)
+        cmp["lead"] = "**{선택_금액}으로 정하기**"
+        doc = build_compare.build_html(cmp, self.run_dir)
+        self.assertIn("<strong><code>{선택_금액}</code>으로 정하기</strong>", doc)
+
+    def test_missing_ut_warns_and_footer_discloses_it(self):
+        cmp = copy.deepcopy(self.cmp)
+        del cmp["ut"]
+        self.assertHas(self.warns(cmp), "ut가 없어요")
+        doc = build_compare.build_html(cmp, self.run_dir)
+        self.assertIn("가상 사용자 반응을 돌리지 않았어요", doc)
+
+    def test_strict_fails_on_warnings(self):
+        cmp = copy.deepcopy(self.cmp)
+        del cmp["ut"]
+        self.write_cmp(cmp)
+        with contextlib.redirect_stdout(io.StringIO()), self.assertRaises(ValueError):
+            build_compare.build(self.run_dir, strict=True)
+
+    def test_capture_coverage_both_ways(self):
+        cap = copy.deepcopy(self.cap)
+        cap["screens"].append({"id": "plan-c", "name": "C안", "shot": "shots/plan-a.svg"})
+        self.assertHas(self.errors(cap=cap), "비교에서 빠졌어요")
+        cap = copy.deepcopy(self.cap)
+        cap["screens"] = cap["screens"][:1]
+        self.assertHas(self.errors(cap=cap), "capture.json에 없는 시안 id")
+        self.assertHas(self.warns(cap=[]), "전수 커버리지를 검사하지 못했어요")
+
+    def test_korean_ids_get_unique_anchors(self):
+        cmp = copy.deepcopy(self.cmp)
+        cmp["variants"][0]["id"], cmp["variants"][1]["id"] = "개선안", "기존안"
+        for cr in cmp["criteria"]:
+            cr["cells"] = {"개선안": cr["cells"]["plan-b"], "기존안": cr["cells"]["plan-a"]}
+        cmp["ut"]["variant"] = "개선안"
+        doc = build_compare.build_html(cmp, self.run_dir)
+        ids = re.findall(r'id="(v-[^"]+)"', doc)
+        self.assertEqual(len(ids), len(set(ids)))
+        self.assertEqual(len(ids), 2)
+
+    def test_malformed_optional_parts_are_errors_not_crashes(self):
+        cmp = copy.deepcopy(self.cmp)
+        cmp["recipe"]["steps"] = "단계"
+        cmp["recipe"]["spec"] = 5
+        cmp["variants"][0]["alt"] = ["x"]
+        errs = self.errors(cmp)
+        self.assertHas(errs, "steps는 목록")
+        self.assertHas(errs, "spec는 목록")
+        self.assertHas(errs, "variants[0].alt는 문자열")
+
+    def test_shot_outside_shots_dir_fails(self):
+        cmp = copy.deepcopy(self.cmp)
+        cmp["variants"][0]["shot"] = "capture.json"
+        self.assertHas(self.errors(cmp), "shot이 RUN/shots/ 아래")
+
+    def test_needs_two_variants_and_build_refuses_invalid(self):
+        cmp = copy.deepcopy(self.cmp)
+        cmp["variants"] = cmp["variants"][:1]
+        self.assertHas(self.errors(cmp), "2개 이상")
+        self.write_cmp(cmp)
+        with contextlib.redirect_stdout(io.StringIO()), self.assertRaises(ValueError):
+            build_compare.build(self.run_dir)
+        self.assertFalse(os.path.exists(os.path.join(self.run_dir, "compare.html")))
 
 
 class HygieneTest(unittest.TestCase):

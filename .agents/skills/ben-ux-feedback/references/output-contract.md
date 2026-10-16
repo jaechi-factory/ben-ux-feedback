@@ -26,6 +26,22 @@ RUN/
 | `input_type` | 필수 | `image` \| `figma` \| `live` |
 | `writing_judge` | 필수 | `ben-ux-writing` \| `fallback` (`writing.md`) |
 | `exclusions` | 선택 | 켠 제외 규칙 문자열 목록 (`input.md`) |
+| `brief` | 선택(없으면 경고) | 리뷰 맥락. 아래 표 |
+
+**run.brief**(SKILL.md 0단계 질문과 같은 순서예요)
+
+| 필드 | 설명 |
+|---|---|
+| `product` | 어떤 제품인가요 |
+| `objective` | 달성하고자 하는 목표 |
+| `problem` | 해결하고자 하는 문제 |
+| `cause` | 왜 이 문제를 겪는가 |
+| `solution` | 어떻게 해결하고자 하나 |
+| `user_value` | 유저가 얻는 기대효과 |
+| `business_value` | 회사가 얻는 기대효과 |
+| `source` | 필수. `user`(사용자가 씀) \| `inferred`(전부 추론) \| `mixed`(일부 추론) |
+
+항목은 모두 문자열이고 빈 항목은 빼도 돼요. 하나도 채우지 않았으면 오류예요. 디자인 결과물 링크나 이미지는 `capture.json`이 맡아요. 리포트는 첫머리 검토 조건 옆에 이 내용을 "검토 전제"로 보여 줘요.
 
 ### screens[]
 | 필드 | 필수 | 설명 |
@@ -244,6 +260,67 @@ RUN/
 }
 ```
 
+## 비교 모드 (compare.json)
+
+같은 목적의 시안 여러 개를 비교할 때 쓰는 결과예요(SKILL.md 0단계). `RUN/compare.json`에 내용만 쓰고, `scripts/build_compare.py`가 검사한 뒤 고정 틀로 `compare.html`을 그려요. HTML을 직접 쓰지 않아요. `capture.json`과 `shots/` 규칙은 단일 모드와 같아요.
+
+| 필드 | 필수 | 설명 |
+|---|---|---|
+| `headline` | 필수 | 결론 한 문장(예: "B안이 가장 좋아요") |
+| `lead` | 필수 | 왜 그런지와 먼저 고칠 것을 두세 문장으로 |
+| `title`, `kicker` | 선택 | 문서 제목, 제목 위 작은 분류 줄 |
+| `variants[]` | 필수 | 시안 2개 이상. 아래 표 |
+| `criteria_lead` | 선택 | 기준을 고른 이유 한 줄 |
+| `criteria[]` | 필수 | 비교 기준 1개 이상. `{label, cells}`이고 `cells`는 시안 `id`마다 `{level, word, note}`예요. `level`은 `good` \| `mid` \| `bad`, `word`는 한두 단어 판정, `note`는 근거 몇 단어(선택) |
+| `common[]` | 선택 | 어느 시안을 고르든 고칠 것. 아래 "지적 항목" 표의 필드에 `title`, `body`, `applies`(해당 시안, 선택)를 더해요 |
+| `exclusions` | 선택 | 켠 제외 규칙 문자열 목록(`input.md`). 단일 모드 `run.exclusions`와 같아요 |
+| `brief` | 선택(없으면 경고) | 리뷰 맥락. 단일 모드 `run.brief`와 같은 형식이고, 리포트 결론 아래 "검토 전제 보기"로 접혀 나와요 |
+| `ut` | 선택(기본 실행) | 1위 시안 가상 UT. 아래 표 |
+| `recipe` | 선택 | 추천 조합. `{lead, steps[{title, detail}], spec[{label, value}], note}` |
+| `checks[]` | 선택 | 화면만으로 알 수 없는 것 `{what, how}` |
+| `footer[]` | 선택 | 검토 대상, 기준, 제외 규칙 같은 메모 문장 |
+
+**variants[]**
+
+| 필드 | 필수 | 설명 |
+|---|---|---|
+| `id` | 필수 | `capture.json`의 화면 id와 같아요 |
+| `rank` | 필수 | 1부터 시안 수까지 한 번씩. 1이 추천안이에요 |
+| `name`, `short` | `name` 필수 | 시안 이름. `short`는 기준별 비교 머리줄에 쓸 짧은 이름(선택) |
+| `shot` | 필수 | `shots/` 아래 이미지 |
+| `one_line` | 필수 | 썸네일 아래 한 줄 평(열 자 안팎) |
+| `why` | 필수 | 순위 목록에 쓰는 이유 한 문장 |
+| `summary` | 필수 | 상세 첫 문단. 이 시안을 한두 문장으로 진단해요 |
+| `goods[]` | `cons`와 둘 중 하나 이상 필수 | 지켜진 원칙과 화면 근거. 검산한 사실도 여기에 써요 |
+| `goods_label` | 선택 | 잘한 점 제목을 바꿀 때(예: "살릴 것") |
+| `cons[]` | `goods`와 둘 중 하나 이상 필수 | 아래 "지적 항목" 표의 필드에 `text`(화면에서 본 문제)를 더해요 |
+| `source`, `alt` | 선택 | 출처 표기(예: 노드 id), 이미지 대체 텍스트 |
+
+**지적 항목(`cons[]`, `common[]`)**은 단일 모드 `findings[]`와 같은 규율을 받아요.
+
+| 필드 | 필수 | 설명 |
+|---|---|---|
+| `severity` | 필수 | `심각` \| `중간` \| `낮음` |
+| `where` | 필수 | 화면 안 위치(단일 모드 `evidence.where`와 같아요) |
+| `fix` | 필수 | 바로 고칠 수 있는 수정안 요약 |
+| `tobe` | 심각은 필수 | 수정 후 모습(문구, 순서, 구성) |
+| `done_when` | 선택(심각은 권장) | 고쳤는지 확인하는 기준 |
+| `principle`, `case` | 선택 | `guideline.md`의 원칙 이름과 `cases.md`의 사례 번호. 억지 연결이면 비워요 |
+| `confirm_needed` | 선택 | 이 지적에서 화면만으로 확인하지 못한 부분 |
+| `id` | 선택 | 가상 UT 반응을 이을 때 쓰는 겹치지 않는 id |
+
+**ut(비교 모드)**: `{mode: "virtual", variant: 1위 시안 id, personas[]}`이고, `personas[]`는 `{name, age_group, device_level, ux_level, traits, goal, device, design, writing, outcome, quote, cause, issue_ids}`예요. 값의 범위와 금지 규칙(수치 금지, 막힘이면 `cause`와 `issue_ids` 필수)은 단일 모드 `ut`와 같아요(`personas.md`). 비교 모드는 시안 한 장을 보니 walk 대신 페르소나마다 반응 하나를 바로 적어요.
+
+검사 수준은 이래요.
+
+- **오류(exit 1)**: 필수 필드와 타입, `rank`(겹치거나 빠짐), 기준 칸 누락(모든 기준에 모든 시안 칸이 있어야 하고 없는 시안 id는 안 돼요), `brief` 형식, `ut.issue_ids`가 1위 시안의 `cons`나 `common` 밖을 가리킴, `severity`·`level` 값, 심각의 `tobe`, 없는 원칙 이름과 사례 번호, 원칙 없이 사례만 있음, shot 경로, 전수 커버리지(`capture.json`과 시안 id가 서로 빠짐없이 맞아야 해요), 가상 UT 구조
+- **경고(`--strict`면 실패)**: `brief` 없음, `ut.variant`가 1위가 아님, 심각의 `done_when` 없음, 훑은 흔적 없는 심각 부재 주장, `tobe` 없는 추상 수정안, 제외 규칙 위반 의심, `ut` 없음, 가상 UT 보통 반응의 연결 없음, 페르소나 구성
+- 화면에 보이는 것만 근거로 쓰고 수량은 직접 센 것만 쓰는 규율은 검사기가 볼 수 없어요. 단일 모드와 똑같이 직접 지켜요.
+
+- 글 안의 `**굵게**`와 `{자리표시}`만 서식으로 바뀌어요. 그 밖의 HTML은 그대로 글자로 나와요.
+
+공통 문제와 시안별 문제는 겹쳐 쓰지 않아요. 둘 이상의 시안에 같은 원인이 있으면 `common`에 한 번만 쓰고 `applies`에 해당 시안을 적어요.
+
 ## 마크다운 출력 형식 (채팅 전용)
 
 `review.json`을 쓸 수 없는 환경에서 써요. 필드는 JSON과 같지만 읽기 좋게 재배치해요. 총평(`summary`)과 검토 조건(`run`)을 맨 위에 두고, 지적은 `severity`를 제목 앞에 두고, `evidence.where`는 "화면" 줄로 올려요. 지적은 심각, 중간, 낮음 순으로 정렬해요. 값이 없는 선택 필드의 줄은 빼요.
@@ -304,3 +381,50 @@ RUN/
 - 가상 UT 절은 `ut`가 있을 때만 쓰고, 표 안에는 쉬움, 보통, 막힘만 적어요. 수치(완주율, 점수, 시간)는 쓰지 않아요. 이탈한 사람은 표가 멈춘 화면에서 끝나요.
 - 채팅은 길이가 길면 읽기 어려우니, 중간과 낮음이 많으면 제목과 제안만 표로 줄이고 심각은 전체 필드를 써요.
 - 검증기를 돌리지 못했다면 마지막에 "검증 스크립트는 실행하지 못했어요"라고 밝혀요.
+
+### 비교 모드 (채팅 전용)
+
+`compare.json`을 쓸 수 없으면 같은 필드를 이 순서로 답해요.
+
+```markdown
+## {headline}
+{lead}
+
+검토 전제: {brief의 채운 항목을 한 줄씩. 추론했으면 "(추론)"}
+
+| 순위 | 시안 | 이유 |
+|---|---|---|
+| {rank} | {name} | {why} |
+
+## 기준별 비교
+| 기준 | {시안 이름들} |
+|---|---|
+| {label} | {word} {note} |
+
+## 어느 시안을 고르든 고칠 것
+### [{severity}] {title} (해당: {applies})
+- 화면: {where}
+- 관찰: {body}
+- 제안: {fix}
+- 수정 후: {tobe}
+- 고쳤는지 확인하는 기준: {done_when}
+- 근거 원칙: {principle} {case}
+- 확인 필요: {confirm_needed}
+
+## 시안별 아쉬운 점
+### {rank}. {name}
+- 잘한 점: {goods}
+- [{severity}] {text} (화면: {where}) → {fix}
+  - 심각이면 아래 줄을 꼭 붙여요: 수정 후: {tobe} · 확인 기준: {done_when} · 근거 원칙: {principle}
+
+## 가상 UT: {1위 시안 name} (실제 사용자 조사가 아니라 화면을 보고 추론한 가상 반응이에요)
+| 사람 | 디바이스 | 시안 이해 | 문구 이해 | 한마디 |
+|---|---|---|---|---|
+| {name} ({age_group}, 디바이스 {device_level}, UX 이해 {ux_level}) | {device} | {design} | {writing} | "{quote}" {막힘이면 원인: cause} |
+
+## 추천 조합
+1. {steps.title}: {steps.detail}
+
+## 확인 필요
+- {what}: {how}
+```

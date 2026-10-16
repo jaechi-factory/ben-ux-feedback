@@ -3,36 +3,75 @@
     "goal": "지출 입력 흐름 첫 시안 검토",
     "product_value": "지출을 3초 안에 적고 한 달 흐름을 바로 본다",
     "input_type": "image",
-    "writing_judge": "fallback"
+    "writing_judge": "fallback",
+    "brief": {
+      "product": "모아가계부, 지출을 빠르게 적고 한 달 흐름을 보는 가계부 앱이에요 (가상 제품)",
+      "objective": "지출 기록을 매일 하게 만들기",
+      "problem": "지출 입력을 시작했다가 저장하지 않고 나가는 사람이 많아요",
+      "cause": "입력 항목이 많고 분류를 고르기 어렵다고 봐요",
+      "solution": "금액을 먼저 받고 분류를 칩으로 고르게 했어요",
+      "user_value": "3초 안에 지출을 적어요",
+      "business_value": "매일 쓰는 사람이 늘어요",
+      "source": "user"
+    }
   },
   "screens": [
-    {"id": "home", "name": "홈", "shot": "shots/home.svg",
-     "screen_goal": "이번 달 남은 돈을 보고 지출 입력으로 들어간다",
-     "verdict": "남은 돈은 한눈에 보이는데 라벨이 너무 작아요."},
-    {"id": "add-expense", "name": "지출 입력", "shot": "shots/add-expense.svg",
-     "screen_goal": "방금 쓴 돈을 금액과 분류로 기록한다",
-     "verdict": "금액 입력은 정석인데 저장 버튼이 가려지고 분류가 전문 용어예요."},
-    {"id": "monthly", "name": "월간 요약", "shot": "shots/monthly.svg",
-     "screen_goal": "이번 달 쓴 돈의 흐름을 주 단위로 본다",
-     "verdict": "합계와 막대는 읽기 쉬운데 필터 버튼에 이름이 없어요."}
+    {
+      "id": "home",
+      "name": "홈",
+      "shot": "shots/home.svg",
+      "screen_goal": "이번 달 남은 돈을 보고 지출 입력으로 들어간다",
+      "verdict": "남은 돈은 한눈에 보이는데 라벨이 너무 작아요."
+    },
+    {
+      "id": "add-expense",
+      "name": "지출 입력",
+      "shot": "shots/add-expense.svg",
+      "screen_goal": "방금 쓴 돈을 금액과 분류로 기록한다",
+      "verdict": "금액 입력은 정석인데 저장 버튼이 가려지고 분류가 전문 용어예요."
+    },
+    {
+      "id": "monthly",
+      "name": "월간 요약",
+      "shot": "shots/monthly.svg",
+      "screen_goal": "이번 달 쓴 돈의 흐름을 주 단위로 본다",
+      "verdict": "합계와 막대는 읽기 쉬운데 필터 버튼에 이름이 없어요."
+    }
   ],
   "findings": [
     {
-      "id": "F01", "screen_id": "add-expense", "severity": "심각", "lens": "화면",
+      "id": "F01",
+      "screen_id": "add-expense",
+      "severity": "심각",
+      "lens": "화면",
       "title": "저장 버튼이 키보드에 가려져요",
       "observation": "금액 입력칸에 포커스가 있는 상태에서 '저장' 버튼이 보이지 않아요. 화면 전체를 훑어도 비슷한 버튼은 없고, 가장 가까운 것은 '취소' 하나뿐이에요.",
       "why": "저장 방법이 보이지 않으면 사용자가 취소를 눌러 입력한 내용을 잃을 수 있어요. 핵심 가치인 3초 기록을 직접 깨뜨려요.",
       "principle": "Clear Action",
       "fix": "저장 버튼을 키보드 위에 붙여 고정해요.",
       "tobe": "금액 입력 중에도 키보드 바로 위에 '저장하기' 버튼을 고정하고, '취소'는 상단 닫기로 옮겨요.",
-      "evidence": {"shot": "shots/add-expense.svg", "where": "화면 하단, 키보드 영역", "type": "shot"},
+      "evidence": {
+        "shot": "shots/add-expense.svg",
+        "where": "화면 하단, 키보드 영역",
+        "type": "shot"
+      },
       "done_when": "키보드가 올라온 상태에서도 '저장하기'가 화면에 보이고, 한 번 눌러 저장돼요.",
       "confirm_needed": "실제 기기에서 키보드가 올라올 때의 동작은 이미지로 볼 수 없어요.",
-      "from_ut": ["p-youth-dhi-umid", "p-mid-dlo-umid", "p-senior-dlo-ulo"],
-      "pin": {"x": 0.5, "y": 0.8}
+      "from_ut": [
+        "p-youth-dhi-umid",
+        "p-mid-dlo-umid",
+        "p-senior-dlo-ulo"
+      ],
+      "pin": {
+        "x": 0.5,
+        "y": 0.8
+      }
     },
     {
-      "id": "F02", "screen_id": "add-expense", "severity": "중간", "lens": "문구",
+      "id": "F02",
+      "screen_id": "add-expense",
+      "severity": "중간",
+      "lens": "문구",
       "title": "분류 이름이 내부 용어예요",
       "observation": "분류 칩 첫 줄에 '변동비', '고정비'가 있어요.",
       "why": "방금 커피를 산 사용자가 어느 쪽인지 바로 알기 어려워 선택에서 멈춰요.",
@@ -41,103 +80,255 @@
       "fix": "사용자가 쓰는 말로 바꿔요.",
       "asis": "변동비 / 고정비",
       "tobe": "그때그때 쓰는 돈 / 매달 나가는 돈",
-      "evidence": {"shot": "shots/add-expense.svg", "where": "분류 칩 첫 줄", "type": "shot"},
+      "evidence": {
+        "shot": "shots/add-expense.svg",
+        "where": "분류 칩 첫 줄",
+        "type": "shot"
+      },
       "done_when": "분류 칩에 '변동비', '고정비'라는 말이 없고, 처음 보는 사람도 칩 이름만 보고 고를 수 있어요.",
       "confirm_needed": "ben-ux-writing 기준 미적용",
-      "from_ut": ["p-youth-dhi-umid", "p-mid-dlo-umid", "p-senior-dlo-ulo"],
-      "pin": {"x": 0.3, "y": 0.35}
+      "from_ut": [
+        "p-youth-dhi-umid",
+        "p-mid-dlo-umid",
+        "p-senior-dlo-ulo"
+      ],
+      "pin": {
+        "x": 0.3,
+        "y": 0.35
+      }
     },
     {
-      "id": "F03", "screen_id": "monthly", "severity": "낮음", "lens": "접근성",
+      "id": "F03",
+      "screen_id": "monthly",
+      "severity": "낮음",
+      "lens": "접근성",
       "title": "필터 버튼이 아이콘뿐이에요",
       "observation": "오른쪽 위 필터 버튼에 깔때기 아이콘만 있고 이름이 없어요.",
       "why": "아이콘 뜻을 모르는 사용자는 기간을 바꿀 수 있다는 걸 모르고 지나쳐요.",
       "principle": null,
       "fix": "아이콘 옆에 '기간 바꾸기'라는 이름을 붙여요.",
-      "evidence": {"shot": "shots/monthly.svg", "where": "화면 오른쪽 위", "type": "shot"},
-      "from_ut": ["p-youth-dhi-umid", "p-mid-dlo-umid"],
-      "pin": {"x": 0.91, "y": 0.09}
+      "evidence": {
+        "shot": "shots/monthly.svg",
+        "where": "화면 오른쪽 위",
+        "type": "shot"
+      },
+      "from_ut": [
+        "p-youth-dhi-umid",
+        "p-mid-dlo-umid"
+      ],
+      "pin": {
+        "x": 0.91,
+        "y": 0.09
+      }
     },
     {
-      "id": "F04", "screen_id": "home", "severity": "낮음", "lens": "접근성",
+      "id": "F04",
+      "screen_id": "home",
+      "severity": "낮음",
+      "lens": "접근성",
       "title": "'이번 달 남은 돈' 라벨이 너무 작아요",
       "observation": "금액은 크게 보이는데 바로 위 라벨은 아주 작고 옅은 회색이에요.",
       "why": "작은 글씨가 힘든 사용자는 큰 숫자가 무엇의 금액인지 알기 어려워요.",
       "principle": null,
       "fix": "라벨을 본문 크기로 키우고 더 진한 색으로 바꿔요.",
-      "evidence": {"shot": "shots/home.svg", "where": "남은 돈 카드 윗줄", "type": "shot"},
-      "from_ut": ["p-mid-dlo-umid", "p-senior-dlo-ulo"],
-      "pin": {"x": 0.2, "y": 0.17}
+      "evidence": {
+        "shot": "shots/home.svg",
+        "where": "남은 돈 카드 윗줄",
+        "type": "shot"
+      },
+      "from_ut": [
+        "p-mid-dlo-umid",
+        "p-senior-dlo-ulo"
+      ],
+      "pin": {
+        "x": 0.2,
+        "y": 0.17
+      }
     },
     {
-      "id": "F05", "screen_id": null, "severity": "중간", "lens": "흐름",
+      "id": "F05",
+      "screen_id": null,
+      "severity": "중간",
+      "lens": "흐름",
       "title": "입력한 지출을 고치거나 지우는 길이 안 보여요",
       "observation": "홈의 '오늘 쓴 돈' 목록에서 한 줄을 눌러 볼 수 있다는 단서가 없고, 수정이나 삭제 화면도 없어요.",
       "why": "금액을 잘못 적은 사용자가 바로잡지 못하면 기록을 믿지 않게 되고, 3초 기록이라는 핵심 가치도 의미가 없어져요.",
       "principle": null,
       "fix": "목록 한 줄에서 수정과 삭제로 들어가는 길과 그 화면을 추가해요.",
-      "evidence": {"shot": "shots/home.svg", "where": "홈 '오늘 쓴 돈' 목록", "type": "shot"},
+      "evidence": {
+        "shot": "shots/home.svg",
+        "where": "홈 '오늘 쓴 돈' 목록",
+        "type": "shot"
+      },
       "done_when": "목록 한 줄을 눌러 금액을 고치거나 지울 수 있고, 그 길이 화면에 단서로 보여요.",
       "confirm_needed": "스와이프나 길게 누르기가 이미 있는지는 이미지로 알 수 없어요."
     }
   ],
   "strengths": [
-    {"note": "금액 입력칸이 화면 첫 요소이고 큰 글씨라서 무엇을 먼저 할지 바로 보여요.", "principle": "Sleek Experience", "screen_id": "add-expense"},
-    {"note": "홈 아래 '지출 추가' 버튼이 하나뿐이라 다음 행동이 헷갈리지 않아요.", "principle": null, "screen_id": "home"}
+    {
+      "note": "금액 입력칸이 화면 첫 요소이고 큰 글씨라서 무엇을 먼저 할지 바로 보여요.",
+      "principle": "Sleek Experience",
+      "screen_id": "add-expense"
+    },
+    {
+      "note": "홈 아래 '지출 추가' 버튼이 하나뿐이라 다음 행동이 헷갈리지 않아요.",
+      "principle": null,
+      "screen_id": "home"
+    }
   ],
   "checks_needed": [
-    {"what": "문장 세부 기준(ben-ux-writing) 미적용", "how": "ben-ux-writing을 설치한 뒤 문구 지적만 다시 판정해요"},
-    {"what": "저장 후 어디로 돌아가는지", "how": "저장 이후 화면을 이미지로 추가해요"}
+    {
+      "what": "문장 세부 기준(ben-ux-writing) 미적용",
+      "how": "ben-ux-writing을 설치한 뒤 문구 지적만 다시 판정해요"
+    },
+    {
+      "what": "저장 후 어디로 돌아가는지",
+      "how": "저장 이후 화면을 이미지로 추가해요"
+    }
   ],
-  "summary": {"headline": "기록 속도는 좋은데 저장 버튼이 가려지고 분류가 어려워요.", "top": ["F01", "F02", "F05"]},
+  "summary": {
+    "headline": "기록 속도는 좋은데 저장 버튼이 가려지고 분류가 어려워요.",
+    "top": [
+      "F01",
+      "F02",
+      "F05"
+    ]
+  },
   "ut": {
     "mode": "virtual",
     "personas": [
-      {"id": "p-youth-dhi-umid", "age_group": "청년", "device_level": "상", "ux_level": "중", "name": "김도현",
-       "traits": "29세, 앱 조작은 빠르고 가계부는 두어 번 써 봤어요. 앱 습관과 다르면 바로 짜증을 내요. 핵심 대상층이에요.",
-       "goal": "방금 쓴 커피값을 적는다"},
-      {"id": "p-mid-dlo-umid", "age_group": "중년", "device_level": "하", "ux_level": "중", "name": "정미경",
-       "traits": "52세, 문구는 끝까지 읽고 이해하지만 작은 버튼과 아이콘만 있는 버튼이 힘들어요. 잘못 눌러 내용을 잃을까 걱정해요.",
-       "goal": "오늘 장 본 돈을 적는다"},
-      {"id": "p-senior-dlo-ulo", "age_group": "노년", "device_level": "하", "ux_level": "하", "name": "박순자",
-       "traits": "68세, 스마트폰은 은행 앱 정도만 써요. 가계부 앱은 처음이고 작은 글씨는 돋보기로 봐요.",
-       "goal": "오늘 시장에서 쓴 돈을 적는다"}
+      {
+        "id": "p-youth-dhi-umid",
+        "age_group": "청년",
+        "device_level": "상",
+        "ux_level": "중",
+        "name": "김도현",
+        "traits": "29세, 앱 조작은 빠르고 가계부는 두어 번 써 봤어요. 앱 습관과 다르면 바로 짜증을 내요. 핵심 대상층이에요.",
+        "goal": "방금 쓴 커피값을 적는다"
+      },
+      {
+        "id": "p-mid-dlo-umid",
+        "age_group": "중년",
+        "device_level": "하",
+        "ux_level": "중",
+        "name": "정미경",
+        "traits": "52세, 문구는 끝까지 읽고 이해하지만 작은 버튼과 아이콘만 있는 버튼이 힘들어요. 잘못 눌러 내용을 잃을까 걱정해요.",
+        "goal": "오늘 장 본 돈을 적는다"
+      },
+      {
+        "id": "p-senior-dlo-ulo",
+        "age_group": "노년",
+        "device_level": "하",
+        "ux_level": "하",
+        "name": "박순자",
+        "traits": "68세, 스마트폰은 은행 앱 정도만 써요. 가계부 앱은 처음이고 작은 글씨는 돋보기로 봐요.",
+        "goal": "오늘 시장에서 쓴 돈을 적는다"
+      }
     ],
     "walks": [
-      {"persona_id": "p-youth-dhi-umid", "outcome": "완주", "steps": [
-        {"screen_id": "home", "device": "쉬움", "design": "쉬움", "writing": "쉬움",
-         "quote": "남은 돈이 바로 보여서 좋아요. 추가 버튼도 바로 보이고요.",
-         "finding_ids": []},
-        {"screen_id": "add-expense", "device": "보통", "design": "쉬움", "writing": "보통",
-         "quote": "금액부터 쳐지는 건 좋은데 저장은 키보드를 내려야 보이네요. 변동비는 좀 어색해요.",
-         "finding_ids": ["F01", "F02"]},
-        {"screen_id": "monthly", "device": "보통", "design": "쉬움", "writing": "쉬움",
-         "quote": "오른쪽 위 아이콘이 뭔지는 눌러 봐야 알겠어요.",
-         "finding_ids": ["F03"]}
-      ]},
-      {"persona_id": "p-mid-dlo-umid", "outcome": "완주", "steps": [
-        {"screen_id": "home", "device": "보통", "design": "쉬움", "writing": "쉬움",
-         "quote": "남은 돈 위에 있는 글씨가 작아서 눈을 찡그리게 돼요.",
-         "finding_ids": ["F04"]},
-        {"screen_id": "add-expense", "device": "막힘", "design": "쉬움", "writing": "보통",
-         "quote": "저장 버튼이 안 보여서 한참 찾았어요. 변동비는 알겠는데 낯선 말이네요.",
-         "cause": "저장 버튼이 키보드에 가려졌어요",
-         "finding_ids": ["F01", "F02"]},
-        {"screen_id": "monthly", "device": "보통", "design": "쉬움", "writing": "쉬움",
-         "quote": "위에 있는 그림은 뭘 하는 건지 이름이 없어서 눌러 봐야 알겠네요.",
-         "finding_ids": ["F03"]}
-      ]},
-      {"persona_id": "p-senior-dlo-ulo", "outcome": "이탈", "stopped_at": "add-expense",
-       "stop_reason": "저장 버튼을 못 찾고 분류 말뜻을 몰라서 입력을 포기했어요",
-       "steps": [
-        {"screen_id": "home", "device": "보통", "design": "보통", "writing": "쉬움",
-         "quote": "숫자는 크게 보이는데 무슨 돈인지 위에 쓴 글씨가 잘 안 보여요.",
-         "finding_ids": ["F04"]},
-        {"screen_id": "add-expense", "device": "막힘", "design": "보통", "writing": "막힘",
-         "quote": "다 쓰고 나면 어디를 눌러요? 변동비가 뭔 말인지도 모르겠어요.",
-         "cause": "저장 버튼이 키보드에 가려졌고 '변동비'를 몰라요",
-         "finding_ids": ["F01", "F02"]}
-      ]}
+      {
+        "persona_id": "p-youth-dhi-umid",
+        "outcome": "완주",
+        "steps": [
+          {
+            "screen_id": "home",
+            "device": "쉬움",
+            "design": "쉬움",
+            "writing": "쉬움",
+            "quote": "남은 돈이 바로 보여서 좋아요. 추가 버튼도 바로 보이고요.",
+            "finding_ids": []
+          },
+          {
+            "screen_id": "add-expense",
+            "device": "보통",
+            "design": "쉬움",
+            "writing": "보통",
+            "quote": "금액부터 쳐지는 건 좋은데 저장은 키보드를 내려야 보이네요. 변동비는 좀 어색해요.",
+            "finding_ids": [
+              "F01",
+              "F02"
+            ]
+          },
+          {
+            "screen_id": "monthly",
+            "device": "보통",
+            "design": "쉬움",
+            "writing": "쉬움",
+            "quote": "오른쪽 위 아이콘이 뭔지는 눌러 봐야 알겠어요.",
+            "finding_ids": [
+              "F03"
+            ]
+          }
+        ]
+      },
+      {
+        "persona_id": "p-mid-dlo-umid",
+        "outcome": "완주",
+        "steps": [
+          {
+            "screen_id": "home",
+            "device": "보통",
+            "design": "쉬움",
+            "writing": "쉬움",
+            "quote": "남은 돈 위에 있는 글씨가 작아서 눈을 찡그리게 돼요.",
+            "finding_ids": [
+              "F04"
+            ]
+          },
+          {
+            "screen_id": "add-expense",
+            "device": "막힘",
+            "design": "쉬움",
+            "writing": "보통",
+            "quote": "저장 버튼이 안 보여서 한참 찾았어요. 변동비는 알겠는데 낯선 말이네요.",
+            "cause": "저장 버튼이 키보드에 가려졌어요",
+            "finding_ids": [
+              "F01",
+              "F02"
+            ]
+          },
+          {
+            "screen_id": "monthly",
+            "device": "보통",
+            "design": "쉬움",
+            "writing": "쉬움",
+            "quote": "위에 있는 그림은 뭘 하는 건지 이름이 없어서 눌러 봐야 알겠네요.",
+            "finding_ids": [
+              "F03"
+            ]
+          }
+        ]
+      },
+      {
+        "persona_id": "p-senior-dlo-ulo",
+        "outcome": "이탈",
+        "stopped_at": "add-expense",
+        "stop_reason": "저장 버튼을 못 찾고 분류 말뜻을 몰라서 입력을 포기했어요",
+        "steps": [
+          {
+            "screen_id": "home",
+            "device": "보통",
+            "design": "보통",
+            "writing": "쉬움",
+            "quote": "숫자는 크게 보이는데 무슨 돈인지 위에 쓴 글씨가 잘 안 보여요.",
+            "finding_ids": [
+              "F04"
+            ]
+          },
+          {
+            "screen_id": "add-expense",
+            "device": "막힘",
+            "design": "보통",
+            "writing": "막힘",
+            "quote": "다 쓰고 나면 어디를 눌러요? 변동비가 뭔 말인지도 모르겠어요.",
+            "cause": "저장 버튼이 키보드에 가려졌고 '변동비'를 몰라요",
+            "finding_ids": [
+              "F01",
+              "F02"
+            ]
+          }
+        ]
+      }
     ]
   }
 }

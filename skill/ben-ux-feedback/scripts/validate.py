@@ -22,6 +22,11 @@ INPUT_TYPES = ("image", "figma", "live")
 WRITING_JUDGES = ("ben-ux-writing", "fallback")
 EVIDENCE_TYPES = ("shot", "console", "dom")
 KNOWN_EXCLUSIONS = ("curly-braces", "dummy-amount-mismatch")
+# 리뷰 전에 받는 맥락(브리프). SKILL.md 0단계의 질문 순서와 같다.
+BRIEF_FIELDS = (("product", "어떤 제품인가요"), ("objective", "달성하려는 목표"), ("problem", "해결하려는 문제"),
+                ("cause", "이 문제를 겪는 이유"),
+                ("solution", "해결 방법"), ("user_value", "유저 기대효과"), ("business_value", "회사 기대효과"))
+BRIEF_SOURCES = ("user", "inferred", "mixed")
 SHOT_EXT = (".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg")
 
 UT_MODE = "virtual"
@@ -160,6 +165,26 @@ def ut_persona_ids(ut):
     if not isinstance(ut, dict) or not isinstance(ut.get("personas"), list):
         return set()
     return {p["id"] for p in ut["personas"] if isinstance(p, dict) and not blank(p.get("id"))}
+
+
+def check_brief(brief, where, errors, warns):
+    """리뷰 맥락(브리프)을 검사한다. 없으면 경고만 한다(맥락 없이도 리뷰는 할 수 있다)."""
+    if brief is None:
+        warns.append(f"{where}가 없어요. 리뷰 맥락을 받지 못했으면 화면에서 추론하고 brief.source를 inferred로 적으세요")
+        return
+    if not isinstance(brief, dict):
+        errors.append(f"{where}는 객체여야 해요")
+        return
+    known = {k for k, _ in BRIEF_FIELDS} | {"source"}
+    for k, v in brief.items():
+        if k not in known:
+            errors.append(f"{where}에 모르는 키가 있어요: {k!r}")
+        elif k != "source" and v is not None and not isinstance(v, str):
+            errors.append(f"{where}.{k}는 문자열이어야 해요")
+    if brief.get("source") not in BRIEF_SOURCES:
+        errors.append(f"{where}.source는 user, inferred, mixed 중 하나여야 해요")
+    if all(blank(brief.get(k)) for k, _ in BRIEF_FIELDS):
+        errors.append(f"{where}에 채운 항목이 하나도 없어요")
 
 
 def scan_ut_scores(node, path, errors):
@@ -330,6 +355,7 @@ def check(rev, cap, run, principles, cases):
         errors.append(f"run.writing_judge는 ben-ux-writing|fallback ({r.get('writing_judge')!r})")
     if "goal" in r and r["goal"] is not None and not isinstance(r["goal"], str):
         errors.append("run.goal은 문자열이어야 해요")
+    check_brief(r.get("brief"), "run.brief", errors, warns)
     exclusions = r.get("exclusions")
     active = set()
     if exclusions is not None:
