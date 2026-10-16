@@ -9,6 +9,7 @@ ben-ux-feedback 2단계: 이미지 입력 수집
 폴더는 바로 아래의 이미지(png, jpg, jpeg, webp, gif)만 읽고 자연 정렬 순서를 화면 순서로 쓴다.
 같은 run 폴더에 다시 실행하면 이번 입력에 없는 옛 shots 이미지는 지운다(capture.json과 어긋나지 않게).
 capture.json에는 절대 경로를 적지 않는다(파일 또는 폴더 이름과 개수만 적는다).
+끝나면 shot 상대 경로를 한 줄씩 출력한다(다음 턴에 capture.json을 다시 읽지 않고 바로 열 수 있게).
 """
 import argparse
 import json
@@ -103,6 +104,8 @@ def main():
     except ValueError as e:
         sys.exit(str(e))
     print(f"WROTE {os.path.join(a.run, 'capture.json')} · 화면 {len(cap['screens'])}")
+    for s in cap["screens"]:
+        print(f"  {s['shot']}")
 
 
 if __name__ == "__main__":

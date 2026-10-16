@@ -17,10 +17,9 @@
 5. 결과는 `runs/<이름>/review.json`에 쓰고 `validate.py`로 검증한 뒤 `build_report.py`로 리포트를 만들어요. 같은 화면의 시안 여러 개를 비교할 때는 `compare.json`을 쓰고 `build_compare.py`로 검사와 리포트를 함께 해요.
 
 ```bash
-python3 skill/ben-ux-feedback/scripts/detect_input.py "<이미지|폴더|Figma URL|http(s) URL>"
+python3 skill/ben-ux-feedback/scripts/detect_input.py "<Figma URL|http(s) URL|애매한 입력>"   # 이미지 파일·폴더는 건너뛰고 바로 image_capture.py
 python3 skill/ben-ux-feedback/scripts/image_capture.py <파일|폴더> --run runs/<이름>
-python3 skill/ben-ux-feedback/scripts/validate.py --run runs/<이름>
-python3 skill/ben-ux-feedback/scripts/build_report.py --run runs/<이름>
+python3 skill/ben-ux-feedback/scripts/validate.py --run runs/<이름> && python3 skill/ben-ux-feedback/scripts/build_report.py --run runs/<이름>
 python3 skill/ben-ux-feedback/scripts/build_compare.py --run runs/<이름>   # 시안 비교
 ```
 

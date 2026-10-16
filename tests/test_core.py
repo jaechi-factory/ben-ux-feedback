@@ -130,6 +130,15 @@ class ImageCaptureTest(RunCase):
         self.assertEqual(saved["source"]["count"], 2)
         self.assertNotIn(self.tmp, json.dumps(saved, ensure_ascii=False))
 
+    def test_main_prints_shot_paths_for_next_turn(self):
+        write(os.path.join(self.tmp, "in", "01-Home.png"), PNG)
+        out = os.path.join(self.tmp, "out")
+        buf = io.StringIO()
+        with mock.patch.object(sys, "argv", ["image_capture.py", os.path.join(self.tmp, "in"), "--run", out]), \
+                contextlib.redirect_stdout(buf):
+            image_capture.main()
+        self.assertIn("shots/01-home.png", buf.getvalue())
+
     def test_duplicate_slugs_get_unique_ids(self):
         write(os.path.join(self.tmp, "in", "a.png"), PNG)
         write(os.path.join(self.tmp, "in", "a.jpg"), PNG)
@@ -521,6 +530,50 @@ class UtValidateTest(RunCase):
         self.assertHasError(self.run_check(rev)[0], "완주인데")
 
 
+    def with_second_screen(self, rev):
+        """capture.json과 review에 '월간' 화면을 더해요(easy_screens 검사용)."""
+        write(os.path.join(self.run_dir, "shots", "monthly.png"), PNG)
+        write(os.path.join(self.run_dir, "capture.json"), json.dumps({
+            "input_type": "image",
+            "screens": [{"id": "home", "name": "홈", "shot": "shots/home.png"},
+                        {"id": "monthly", "name": "월간", "shot": "shots/monthly.png"}],
+            "edges": []}))
+        rev["screens"].append({"id": "monthly", "name": "월간", "shot": "shots/monthly.png",
+                               "screen_goal": "한 달 흐름을 본다", "verdict": "문제없어요."})
+        return rev
+
+    def test_easy_screens_replace_all_easy_steps(self):
+        rev = self.with_second_screen(self.review_with_ut())
+        w = rev["ut"]["walks"][0]
+        w.update({"outcome": "완주", "easy_screens": ["monthly"]})
+        del w["stopped_at"], w["stop_reason"]
+        errors, _ = self.run_check(rev)
+        self.assertEqual(errors, [])
+
+        w["steps"].append({"screen_id": "monthly", "device": "쉬움", "design": "쉬움", "writing": "쉬움",
+                           "quote": "괜찮네요", "finding_ids": []})
+        self.assertHasError(self.run_check(rev)[0], "steps에도 있어요")
+        w["steps"].pop()
+
+        w["easy_screens"] = ["ghost"]
+        self.assertHasError(self.run_check(rev)[0], "easy_screens에 screens에 없는 화면 id")
+
+        w["easy_screens"] = "monthly"
+        self.assertHasError(self.run_check(rev)[0], "easy_screens는 화면 id 목록")
+
+        w.update({"outcome": "이탈", "stopped_at": "home", "stop_reason": "포기했어요", "easy_screens": ["home"]})
+        self.assertHasError(self.run_check(rev)[0], "easy_screens에 올 수 없어요")
+
+        # 모든 화면이 쉬움인 완주 walk만 steps를 비울 수 있어요
+        w.update({"outcome": "완주", "steps": [], "easy_screens": ["home", "monthly"]})
+        del w["stopped_at"], w["stop_reason"]
+        self.assertEqual(self.run_check(rev)[0], [])
+        w["easy_screens"] = []
+        self.assertHasError(self.run_check(rev)[0], "steps는 비어 있지 않은 목록")
+        w.update({"outcome": "이탈", "stopped_at": "home", "stop_reason": "포기했어요", "easy_screens": ["monthly"]})
+        self.assertHasError(self.run_check(rev)[0], "steps는 비어 있지 않은 목록")
+
+
 class ReportTest(RunCase):
     def put_review(self, rev):
         write(os.path.join(self.run_dir, "review.json"), json.dumps(rev, ensure_ascii=False))
@@ -534,6 +587,33 @@ class ReportTest(RunCase):
     def read(self, name):
         with open(os.path.join(self.run_dir, name), encoding="utf-8") as fh:
             return fh.read()
+
+    def test_easy_screens_render_compactly(self):
+        rev = self.ut_review()
+        write(os.path.join(self.run_dir, "shots", "monthly.png"), PNG)
+        rev["screens"].append({"id": "monthly", "name": "월간", "shot": "shots/monthly.png",
+                               "screen_goal": "한 달 흐름을 본다", "verdict": "문제없어요."})
+        rev["ut"]["walks"][0]["easy_screens"] = ["monthly"]
+        self.put_review(rev)
+        build_report.build(self.run_dir)
+        html = self.read("report.html")
+        self.assertIn("세 가지 모두 쉬움", html)
+        self.assertNotIn("걷지 않았어요", html)
+        self.assertIn("나머지는 세 가지 모두 쉬움: 월간", self.read("report.md"))
+
+    def test_all_easy_walk_renders_without_steps(self):
+        rev = self.ut_review()
+        w = rev["ut"]["walks"][0]
+        w.update({"outcome": "완주", "steps": [], "easy_screens": ["home"]})
+        del w["stopped_at"], w["stop_reason"]
+        self.put_review(rev)
+        build_report.build(self.run_dir)
+        html = self.read("report.html")
+        self.assertIn("세 가지 모두 쉬움", html)
+        self.assertIn("<b>완주</b>", html)
+        md = self.read("report.md")
+        self.assertNotIn("| 화면 | 디바이스 |", md)
+        self.assertIn("나머지는 세 가지 모두 쉬움: 홈", md)
 
     def test_strings_are_html_escaped(self):
         rev = self.ut_review()

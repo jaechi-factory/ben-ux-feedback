@@ -150,7 +150,8 @@ RUN/
 | `outcome` | 필수 | `완주` \| `이탈` |
 | `stopped_at` | 이탈이면 필수 | 멈춘 화면 id(`screens[].id`). 완주면 쓰지 않아요 |
 | `stop_reason` | 이탈이면 필수 | 멈춘 이유. 완주면 쓰지 않아요 |
-| `steps[]` | 필수 | 걸은 화면 순서대로 최소 1개 |
+| `steps[]` | 필수 | 걸은 화면 순서대로. 모든 화면이 쉬움인 완주 walk만 빈 목록이어도 돼요(그때 `easy_screens`에 전부 적어요) |
+| `easy_screens[]` | 선택 | 세 축이 모두 쉬움이어서 step을 쓰지 않은 화면 id 목록. `steps`와 겹치지 않고, 이탈이면 `stopped_at`은 넣을 수 없어요 |
 
 **steps[]**
 
@@ -167,6 +168,7 @@ RUN/
 규칙은 다음과 같아요.
 
 - 세 축의 값은 `쉬움`, `보통`, `막힘` 세 가지뿐이에요. 점수, 시간, 완주율 같은 수치와 숫자 값은 `ut` 안에 어디에도 쓰지 않아요.
+- 세 축이 모두 쉬움인 화면은 step을 쓰지 않고 walk의 `easy_screens`에 id만 적어요. 한마디도 쓰지 않아요. 모든 화면이 쉬우면 `steps`를 빈 목록으로 두고 `easy_screens`에 전부 적어요(완주만). 이탈 walk는 멈춘 화면의 step이 있어야 해요. `easy_screens`는 단일·흐름 모드의 walk에만 있어요.
 - 막힘 반응은 `finding_ids`로 지적에 이어요(오류). 보통 반응도 이어요(경고). 기존 지적이 없으면 새 지적을 만들고, 그 지적의 `from_ut`에 페르소나 id를 넣어요.
 - 이탈한 walk의 마지막 step은 `stopped_at` 화면이에요(경고).
 - `from_ut`의 id는 `ut.personas`에 있어야 해요.
@@ -178,7 +180,7 @@ RUN/
 | 수준 | 항목 |
 |---|---|
 | 오류 | 필수 필드와 형식(타입 포함), `severity`, `lens`, `run` 값, `screens`가 비어 있음, 없는 `screen_id`, shot 파일이 없거나 `RUN/shots/` 밖이거나 이미지 확장자(png, jpg, jpeg, webp, gif, svg)가 아님, 존재하지 않는 원칙 이름과 사례 번호, `principle`이 `null`인데 `case`가 있음, 심각의 `tobe`, 문구의 `asis`와 `tobe`, `fallback`인데 문구 지적에 `confirm_needed`가 없음, `summary.top`이 5개를 넘거나 없는 id를 가리킴, `capture.json` 화면이 `screens`에서 빠짐, 파트 사이 finding id 중복 |
-| 오류(ut) | `mode`가 `virtual`이 아님, 페르소나 `id`가 비었거나 겹침, 페르소나의 `age_group`이 청년, 중년, 노년 밖, `device_level`이나 `ux_level`이 상, 중, 하 밖, 옛 필드 `age_band`나 `tech`가 있음, 페르소나와 walk가 1:1이 아님, 없는 `screen_id`, 세 축 값이 세 단계 밖, `quote` 비어 있음, 막힘인데 `cause`나 `finding_ids`가 없음, 없는 finding id, 이탈인데 `stopped_at`이나 `stop_reason`이 없음, 완주인데 둘이 있음, `from_ut`의 없는 페르소나, 숫자 값과 점수류 필드 |
+| 오류(ut) | `mode`가 `virtual`이 아님, 페르소나 `id`가 비었거나 겹침, 페르소나의 `age_group`이 청년, 중년, 노년 밖, `device_level`이나 `ux_level`이 상, 중, 하 밖, 옛 필드 `age_band`나 `tech`가 있음, 페르소나와 walk가 1:1이 아님, 없는 `screen_id`, 세 축 값이 세 단계 밖, `quote` 비어 있음, 막힘인데 `cause`나 `finding_ids`가 없음, 없는 finding id, 이탈인데 `stopped_at`이나 `stop_reason`이 없음, 완주인데 둘이 있음, `from_ut`의 없는 페르소나, 숫자 값과 점수류 필드, `easy_screens`의 없는 화면이나 `steps`와 겹침이나 멈춘 화면 포함, `easy_screens` 없이 `steps`가 빈 목록 |
 | 오류 | 선택 필드 `done_when`이 문자열이 아님 |
 | 경고 | 심각 지적에 `done_when`이 없음 |
 | 경고 | 보통인데 연결된 지적이 없음, 마지막 step이 `stopped_at`과 다름, `from_ut`로 표시했는데 그 walk에서 연결한 step이 없음 |
@@ -363,6 +365,8 @@ RUN/
 | 화면 | 디바이스 | 시안 이해 | 문구 이해 | 한마디 |
 |---|---|---|---|---|
 | {screens.name} (`{screen_id}`) | {device} | {design} | {writing} | "{quote}" {막힘이면 원인: cause} |
+
+나머지는 세 가지 모두 쉬움: {easy_screens의 화면 이름들} (있을 때만)
 
 ### 반응에서 나온 지적
 - {name} · {screens.name}: {막힘 또는 보통인 축} → {finding id} {title}

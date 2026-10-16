@@ -106,7 +106,7 @@ class PublicContentTest(unittest.TestCase):
         text = (ROOT / "LICENSE").read_text(encoding="utf-8")
         self.assertIn("MIT License", text)
         self.assertIn("jaechi", text)
-        self.assertEqual((ROOT / "VERSION").read_text(encoding="utf-8").strip(), "0.2.0")
+        self.assertEqual((ROOT / "VERSION").read_text(encoding="utf-8").strip(), "0.2.1")
 
     def test_gitignore_keeps_local_files_out(self):
         lines = (ROOT / ".gitignore").read_text(encoding="utf-8").split()

@@ -189,7 +189,12 @@ class Model:
         for pid, w in walks.items():
             for st in dicts(w.get("steps")):
                 steps.setdefault((pid, t(st.get("screen_id"))), st)
-        reached = {sid for (_pid, sid) in steps}
+        easy = set()   # (persona_id, screen_id) 세 축이 모두 쉬움이라 step을 생략한 화면
+        for pid, w in walks.items():
+            for sid in strs(w.get("easy_screens")):
+                if (pid, sid) not in steps:
+                    easy.add((pid, sid))
+        reached = {sid for (_pid, sid) in steps} | {sid for (_pid, sid) in easy}
         cols = [s for s in self.screens if t(s.get("id")) in reached]
         by_finding = {}   # finding id -> [persona id]
         known = {t(p.get("id")) for p in personas}
@@ -206,7 +211,7 @@ class Model:
             for st in dicts(w.get("steps")):
                 for fid in strs(st.get("finding_ids")):
                     step_for.setdefault((fid, pid), st)
-        return {"personas": personas, "walks": walks, "steps": steps, "cols": cols,
+        return {"personas": personas, "walks": walks, "steps": steps, "cols": cols, "easy": easy,
                 "by_finding": by_finding, "step_for": step_for,
                 "persona_by_id": {t(p["id"]): p for p in personas}}
 
@@ -428,7 +433,7 @@ ul,ol{padding-left:24px}
 .lv-block i{border-radius:2px;background:var(--red-500)}
 .lv-block{font-weight:700}
 .quote{margin-top:12px;color:var(--grey-900)}
-.cause,.links,.skipped{margin-top:8px;color:var(--grey-700)}
+.cause,.links,.skipped{margin-top:8px;color:var(--grey-700)}.easy{margin:0}
 .skipped{color:var(--grey-700)}
 .legend{margin-top:16px;display:flex;flex-wrap:wrap;gap:8px 24px;font-size:var(--t6);color:var(--grey-700)}
 .plain-list{margin-top:16px;display:grid;gap:12px;list-style:none;padding:0}
@@ -788,7 +793,11 @@ def render_ut(m):
             label = esc(m.screen_name(sid))
             st = ut["steps"].get((pid, sid))
             if st is None:
-                tds.append(f'<td role="cell" data-label="{label}"><p class="skipped">걷지 않았어요</p></td>')
+                if (pid, sid) in ut["easy"]:
+                    tds.append(f'<td role="cell" data-label="{label}"><p class="easy">'
+                               f'<span class="lv lv-ok"><i aria-hidden="true"></i>세 가지 모두 쉬움</span></p></td>')
+                else:
+                    tds.append(f'<td role="cell" data-label="{label}"><p class="skipped">걷지 않았어요</p></td>')
                 continue
             lis = []
             for key, an in AXES:
@@ -1065,7 +1074,9 @@ def build_md(m):
             head = f"### {mt(p.get('name'))}: {mt(w.get('outcome'))}"
             if w.get("outcome") == "이탈":
                 head += f"  ({code(w.get('stopped_at'))}에서 멈춤, 이유: {mt(w.get('stop_reason'))})"
-            L += ["", head, "| 화면 | 디바이스 | 시안 이해 | 문구 이해 | 한마디 |", "|---|---|---|---|---|"]
+            L += ["", head]
+            if dicts(w.get("steps")):
+                L += ["| 화면 | 디바이스 | 시안 이해 | 문구 이해 | 한마디 |", "|---|---|---|---|---|"]
             for st in dicts(w.get("steps")):
                 sid = t(st.get("screen_id"))
                 quote = f"\"{mc(st.get('quote'))}\""
@@ -1079,6 +1090,9 @@ def build_md(m):
                     ft = ", ".join(f"{mt(x)} {mt(m.finding_by_id[x].get('title'))}" if x in m.finding_by_id else mt(x)
                                    for x in fids)
                     links.append(f"- {mt(p.get('name'))} · {mt(m.screen_name(sid))}: {', '.join(weak)} → {ft}")
+            easy = [s for s in strs(w.get("easy_screens")) if (pid, s) not in ut["steps"]]
+            if easy:
+                L += ["", "나머지는 세 가지 모두 쉬움: " + ", ".join(f"{mc(m.screen_name(s))} ({code(s)})" for s in easy)]
         if links:
             L += ["", "### 반응에서 나온 지적"] + links
 

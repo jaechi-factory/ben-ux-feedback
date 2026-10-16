@@ -280,8 +280,14 @@ def check_ut(ut, screens, fids, errors, warns):
             errors.append(f"{tag}: 완주인데 stopped_at 또는 stop_reason이 있어요")
 
         steps = w.get("steps")
-        if not isinstance(steps, list) or not steps:
-            errors.append(f"{tag}: steps는 비어 있지 않은 목록이어야 해요")
+        easy = w.get("easy_screens")
+        easy_ok = isinstance(easy, list) and bool(easy) and all(isinstance(x, str) for x in easy)
+        if not isinstance(steps, list):
+            errors.append(f"{tag}: steps는 목록이어야 해요")
+            continue
+        if not steps and not (easy_ok and outcome == "완주"):
+            errors.append(f"{tag}: steps는 비어 있지 않은 목록이어야 해요"
+                          "(모든 화면이 쉬움인 완주 walk만 비울 수 있고, 그때는 easy_screens에 화면을 적어요)")
             continue
         for j, st in enumerate(steps):
             if not isinstance(st, dict):
@@ -319,7 +325,20 @@ def check_ut(ut, screens, fids, errors, warns):
                 errors.append(f"{stag}: 막힘 반응은 finding_ids에 지적을 1개 이상 연결해야 해요")
             elif medium and not fin:
                 warns.append(f"{stag}: 보통 반응인데 연결된 지적이 없어요. 고칠 점이 있으면 지적에 연결하세요")
-        if outcome == "이탈" and not blank(stopped_at) and isinstance(steps[-1], dict) \
+        # 세 축이 모두 쉬움이라 step을 생략한 화면(선택). steps와 겹치지 않고, 멈춘 화면은 올 수 없다
+        if easy is not None:
+            if not isinstance(easy, list) or not all(isinstance(x, str) for x in easy):
+                errors.append(f"{tag}: easy_screens는 화면 id 목록이어야 해요")
+            else:
+                step_sids = {st.get("screen_id") for st in steps if isinstance(st, dict)}
+                for x in easy:
+                    if x not in screens:
+                        errors.append(f"{tag}: easy_screens에 screens에 없는 화면 id {x!r}")
+                    elif x in step_sids:
+                        errors.append(f"{tag}: easy_screens의 {x}는 steps에도 있어요. 한쪽에만 적어요")
+                if outcome == "이탈" and stopped_at in easy:
+                    errors.append(f"{tag}: 멈춘 화면 {stopped_at}은 easy_screens에 올 수 없어요")
+        if outcome == "이탈" and not blank(stopped_at) and steps and isinstance(steps[-1], dict) \
                 and steps[-1].get("screen_id") != stopped_at:
             warns.append(f"{tag}: 마지막 step의 화면이 stopped_at({stopped_at})과 달라요")
 

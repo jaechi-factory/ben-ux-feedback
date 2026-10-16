@@ -68,6 +68,8 @@ Claude Code에서 가장 편하게 쓰고, Codex와 채팅형 LLM(ChatGPT, Gemin
 ## 디자인 결과물 링크나 이미지
 ```
 
+양식은 답변의 첫 글로 먼저 보여 주고, 쓰는 동안 기준 문서와 화면을 열어 둬요. 양식 아래에는 가상 UT(가상 사용자 3명 반응)를 뺄 수 있다는 한 줄이 붙어요. 빼면 결과가 더 빨리 나와요.
+
 맥락은 만든 사람의 전제로만 써요. 지적 근거는 언제나 화면이에요.
 
 ## 입력
@@ -93,8 +95,7 @@ python3 skill/ben-ux-feedback/scripts/build_report.py --run skill/ben-ux-feedbac
 `examples/sample-run/report.html`이 생기면 브라우저로 열어요. 내 결과는 검증을 먼저 하고 만들어요.
 
 ```bash
-python3 skill/ben-ux-feedback/scripts/validate.py --run runs/<이름>
-python3 skill/ben-ux-feedback/scripts/build_report.py --run runs/<이름>
+python3 skill/ben-ux-feedback/scripts/validate.py --run runs/<이름> && python3 skill/ben-ux-feedback/scripts/build_report.py --run runs/<이름>
 ```
 
 ### 시안 비교

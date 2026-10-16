@@ -12,7 +12,7 @@
 
 설치 여부는 스킬 목록이나 `ben-ux-writing/SKILL.md`를 읽을 수 있는지로 확인해요. 읽을 수 있으면 `run.writing_judge`는 `ben-ux-writing`이에요.
 
-1. ben-ux-writing의 `SKILL.md`를 읽고, 그 스킬이 요구하는 기준 파일 읽기 순서를 따라요. 읽지 않은 파일을 근거로 들지 않고, 규칙 ID를 기억으로 보충하지 않아요.
+1. ben-ux-writing의 `SKILL.md`, 그 스킬이 항상 먼저 읽으라고 하는 기준 파일 세 개(`references/01_CONSTITUTION.md`, `references/02_DECISION_ENGINE.md`, `references/07_EVALUATOR.md`), 피드백에서 문제 유형 이름에 쓰는 `references/06_ANTI_PATTERN_LIBRARY.md`를 이 스킬의 필수 문서와 같은 턴에 병렬로 읽어요. 설치 위치는 보통 이 스킬과 같은 skills 폴더 옆이에요. 그 스킬의 `SKILL.md`가 다른 파일을 요구하면 그쪽을 따라요. 읽지 않은 파일을 근거로 들지 않고, 규칙 ID를 기억으로 보충하지 않아요.
 2. 요청 종류는 **피드백(REVIEW)** 으로 다뤄요. 대상은 화면에서 직접 본 문구예요.
 3. 그 스킬의 판정(WRITE, KEEP, DELETE, REDESIGN)과 출력 순서(문제 문구 → 문제 → 사용자 어려움 → 수정안 → 필요하면 UI 개선)를 따라요. 아래 표로 finding에 옮겨요.
 
