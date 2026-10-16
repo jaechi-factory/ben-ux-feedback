@@ -1012,6 +1012,8 @@ class BriefTest(RunCase):
               "## 이 개선을 통해서 회사가 얻는 기대효과는 무엇인가요?", "## 디자인 결과물 링크나 이미지"]
         pos = [skill.index(q) for q in qs]
         self.assertEqual(pos, sorted(pos))
+        line = "안 써도 리뷰할 수 있지만, 자세히 쓸수록 더 정확한 피드백이 나와요."
+        self.assertLess(skill.index(line), pos[0])  # 안내 한 줄은 양식 바로 위에 그대로 나와요
 
     def test_report_shows_brief_as_premise(self):
         rev = good_review()
