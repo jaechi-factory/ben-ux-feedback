@@ -1,6 +1,6 @@
 {
   "files": {
-    ".agents/skills/ben-ux-feedback/SKILL.md": "af993e0107135bede37d52cbeb053e0de452633ebd5490b6de1539bc6b9bd122",
+    ".agents/skills/ben-ux-feedback/SKILL.md": "29adbb2bf56c11e62cd8357db3fbfd4e3837ef85a33c2767bf3667466aee7c93",
     ".agents/skills/ben-ux-feedback/examples/sample-compare/capture.json": "6ea712620b9898425c0c57d1a113d01ba2b11936f9dfa9f4062c25b5f9e36b95",
     ".agents/skills/ben-ux-feedback/examples/sample-compare/compare.json": "46c58eca14dec71620bdbbfcd3f0ad8b6f7679f46209a3b5f4182a0176e84ec9",
     ".agents/skills/ben-ux-feedback/examples/sample-compare/shots/plan-a.svg": "5b451ab0c946457068d2e0f0ef37247219b88484fc493082d3132e91166ea81c",
@@ -25,7 +25,7 @@
     ".agents/skills/ben-ux-feedback/scripts/figma_capture.py": "fac37fbdec470f89f4298c474d560cc284899b50d3f2561803dd3d6b4956d0d7",
     ".agents/skills/ben-ux-feedback/scripts/image_capture.py": "222183547d4b2d7784542ce7d1414f2f51444390ff2d935674afead60c50832e",
     ".agents/skills/ben-ux-feedback/scripts/validate.py": "85d610081837793b117d7869104f4000befee8bb706afef0ce33fae96dec21c9",
-    ".claude/skills/ben-ux-feedback/SKILL.md": "af993e0107135bede37d52cbeb053e0de452633ebd5490b6de1539bc6b9bd122",
+    ".claude/skills/ben-ux-feedback/SKILL.md": "29adbb2bf56c11e62cd8357db3fbfd4e3837ef85a33c2767bf3667466aee7c93",
     ".claude/skills/ben-ux-feedback/examples/sample-compare/capture.json": "6ea712620b9898425c0c57d1a113d01ba2b11936f9dfa9f4062c25b5f9e36b95",
     ".claude/skills/ben-ux-feedback/examples/sample-compare/compare.json": "46c58eca14dec71620bdbbfcd3f0ad8b6f7679f46209a3b5f4182a0176e84ec9",
     ".claude/skills/ben-ux-feedback/examples/sample-compare/shots/plan-a.svg": "5b451ab0c946457068d2e0f0ef37247219b88484fc493082d3132e91166ea81c",
@@ -53,10 +53,10 @@
     "chat/00_START_HERE.md": "f3caeee88e4bd57beff451b5d319b449c762596e4482123405af8561b35ef6f6",
     "chat/KNOWLEDGE.md": "cea0b50d9ce9b3b25d93ff1f0b38cf21107e71c0cea42c1e4615467d1b58a731",
     "chat/KNOWLEDGE_APPENDIX.md": "5c3712856f7bd6a8dbe66f1ade4062043bed0c892c8ba29fc7824573df27275e",
-    "chat/PROJECT_INSTRUCTIONS.md": "b3a21e6574fbd5c125ee2f87cf4c18ac66695901b4e796047f56917ab9838123",
+    "chat/PROJECT_INSTRUCTIONS.md": "d7deb3b3cb0a79db1cc90fa58a04f1ff503112eba9d0ade929ade6a03e6c4cd6",
     "chat/REQUEST_EXAMPLES.md": "3d358806beb9b569e1a74ca577f153556c93528e906ef9cf05ca558aaded464f"
   },
   "generator": "scripts/build.py",
   "source": "skill/ben-ux-feedback",
-  "version": "0.2.1"
+  "version": "0.2.2"
 }
