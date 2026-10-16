@@ -654,7 +654,7 @@ def build(run, out=None, check_only=False, strict=False, guideline=None, cases_p
     if check_only:
         print(f"PASS: 시안 {len(cmp['variants'])}개, 기준 {len(cmp['criteria'])}개, 경고 {len(warns)}")
         return None
-    out = out or os.path.join(run, "compare.html")
+    out = os.path.expanduser(out) if out else os.path.join(run, "compare.html")
     with open(out, "w", encoding="utf-8") as fh:
         fh.write(build_html(cmp, run))
     size = os.path.getsize(out)

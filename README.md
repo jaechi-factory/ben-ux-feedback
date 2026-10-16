@@ -84,7 +84,7 @@ Claude Code에서 가장 편하게 쓰고, Codex와 채팅형 LLM(ChatGPT, Gemin
 
 ## 결과물
 
-실행 폴더(`runs/<이름>/`)에 `review.json`(정본), `report.html`, `report.md`가 생겨요. `runs/`는 git에 올라가지 않아요.
+실행 폴더(`runs/<이름>/`)에 `review.json`(정본)과 `report.md`가 생기고, `report.html`은 바탕화면(`~/Desktop/<이름>-report.html`)에 생겨요. `runs/`는 git에 올라가지 않아요.
 
 예시 run이 `skill/ben-ux-feedback/examples/sample-run/`에 있어요(가상 가계부 앱 3화면). 리포트는 이 명령으로 다시 만들어요.
 
@@ -95,7 +95,7 @@ python3 skill/ben-ux-feedback/scripts/build_report.py --run skill/ben-ux-feedbac
 `examples/sample-run/report.html`이 생기면 브라우저로 열어요. 내 결과는 검증을 먼저 하고 만들어요.
 
 ```bash
-python3 skill/ben-ux-feedback/scripts/validate.py --run runs/<이름> && python3 skill/ben-ux-feedback/scripts/build_report.py --run runs/<이름>
+python3 skill/ben-ux-feedback/scripts/validate.py --run runs/<이름> && python3 skill/ben-ux-feedback/scripts/build_report.py --run runs/<이름> --out ~/Desktop/<이름>-report.html
 ```
 
 ### 시안 비교

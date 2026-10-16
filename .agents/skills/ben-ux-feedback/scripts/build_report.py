@@ -5,8 +5,8 @@ ben-ux-feedback 5단계: 리포트 빌드
 RUN/review.json(과 선택 ut)을 읽어 단일 HTML(이미지 내장)과 마크다운을 만든다.
 review.json은 바꾸지 않는다. 외부 네트워크 요청이 없고 표준 라이브러리만 쓴다.
 
-사용: python3 build_report.py --run ./run [--format html|md|both]
-결과: RUN/report.html, RUN/report.md
+사용: python3 build_report.py --run ./run [--format html|md|both] [--out 경로.html]
+결과: RUN/report.html (또는 --out 경로), RUN/report.md
 """
 import argparse
 import base64
@@ -1121,8 +1121,9 @@ def load_json(path):
         raise ValueError(f"{os.path.basename(path)} JSON 파싱 실패: {e.lineno}행, {e.msg}")
 
 
-def build(run, fmt="both", cases_path=None):
-    """RUN의 리포트를 만들고 쓴 파일 경로 목록을 돌려준다. cases_path는 사례 출처 링크용 cases.md."""
+def build(run, fmt="both", cases_path=None, out=None):
+    """RUN의 리포트를 만들고 쓴 파일 경로 목록을 돌려준다. cases_path는 사례 출처 링크용 cases.md.
+    out은 HTML을 쓸 경로(없으면 RUN/report.html). report.md는 늘 RUN에 쓴다."""
     rev_path = os.path.join(run, "review.json")
     if not os.path.isfile(rev_path):
         raise ValueError(f"review.json이 없어요 ({rev_path}). 샤딩이면 먼저 validate.py를 돌려 합쳐요")
@@ -1135,7 +1136,7 @@ def build(run, fmt="both", cases_path=None):
     written = []
     if fmt in ("html", "both"):
         doc, n_img, missing = build_html(m, run)
-        p = os.path.join(run, "report.html")
+        p = os.path.expanduser(out) if out else os.path.join(run, "report.html")
         with open(p, "w", encoding="utf-8") as fh:
             fh.write(doc)
         written.append(p)
@@ -1159,9 +1160,10 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--run", default="./run")
     ap.add_argument("--format", choices=("html", "md", "both"), default="both")
+    ap.add_argument("--out", help="HTML을 쓸 경로. 기본은 RUN/report.html")
     a = ap.parse_args()
     try:
-        build(a.run, a.format)
+        build(a.run, a.format, out=a.out)
     except (ValueError, OSError) as e:
         sys.exit(str(e))
 
