@@ -127,6 +127,8 @@ JSON을 쓰기 전에 아래를 한 번 훑어요. 검증기가 가장 자주 �
 - `screens`에 `capture.json`의 모든 화면 id가 있고, `evidence.shot`은 `shots/` 아래 실제 파일이에요.
 - 문구 지적은 `asis`와 `tobe`가 있고, `writing_judge`가 `fallback`이면 `confirm_needed`에 미적용을 적어요.
 - `run.brief`에 `source`가 있어요.
+- 메이커가 읽는 글(제목, 관찰, 왜, 수정안, 확인 기준, 진단, 잘 된 점, 확인 필요, 가상 반응)에 화면·지적 id, 문구 규칙 코드, 사례 번호, 영어 원칙 이름이 없어요. 화면은 이름으로 부르고, 원칙은 `principle` 칸에만 적어요(검증기가 경고해요). 이 글은 ben-ux-writing 기준(쉬운 한국어, 구체성, 해요체)으로 써요.
+- 잘 된 점과 확인 필요는 의미 있는 것만 남겨요. 확인 필요는 답을 받으면 판정이 바뀌는 것만 쓰고, 지적의 `confirm_needed`에 이미 있는 것은 되풀이하지 않아요.
 - 화면 지적마다 `pin`이 있어요(`{x, y, w, h}` 0~1 비율). Figma는 노드 좌표를 프레임 크기로 나눠 적고, 이미지는 눈대중으로 적어요. 없으면 지적 카드에 위치 그림이 빠져요.
 - 가상 UT는 막힘마다 `cause`와 `finding_ids`, 이탈이면 `stopped_at`과 `stop_reason`이 있고 숫자 값이 없어요.
 
@@ -155,7 +157,7 @@ python3 $SK/scripts/validate.py --run $RUN && python3 $SK/scripts/build_report.p
 ### 5) 출력
 `review.json`(비교 모드는 `compare.json`)을 쓸 수 있으면 그것이 정본이에요. 채팅만 되는 환경이면 `references/output-contract.md`의 마크다운 형식으로 같은 필드를 읽기 좋게 재배치해 답해요(가상 UT 절 포함). 채팅 답변은 총평과 심각 지적을 먼저 두는 두괄식이에요. 문구는 해요체로 써요.
 
-`build_report.py`는 `report.html`(이미지를 안에 담은 단일 파일, 외부 요청 없음)과 `RUN/report.md`를 써요(`--format html|md|both`, 기본 `both`). `build_compare.py`는 `compare.html`을 써요. 두 스크립트 모두 `--out 경로.html`로 HTML 위치를 정해요. **HTML 리포트는 반드시 바탕화면(`~/Desktop/<대상 이름>-report.html`, 비교 모드는 `~/Desktop/<대상 이름>-compare.html`)에 만들어요.** 바탕화면 경로가 다른 환경이면 그 환경의 바탕화면을 써요. `review.json`, `compare.json`, `report.md`, `capture.json`, `shots/`는 실행 폴더에 그대로 둬요. 두 HTML은 고정 틀이라 직접 쓰지 않고 내용(JSON)만 써요. 리포트의 지적 카드는 시니어가 옆에서 짚어 주는 순서예요: `pin`으로 잘라낸 위치 그림 → 무엇이 문제인가 → 사용자에게 생기는 일(원칙 이름과 그 검토 질문, 같은 원칙의 지적, 가상 반응은 첫 번째 지적에만 한마디) → 수정 전·후 → 고쳤는지 확인하는 기준. 고쳤어요·문제 아님 표시는 지적 단위이고, 검토 전제는 접혀 있어요. 틀의 구조와 안전성은 테스트로 검증해 두었으니 매번 화면을 띄워 레이아웃을 다시 확인하지 않아요. 지적이 없는 화면은 HTML에 이미지 없이 이름만 적혀요. 그래서 "내장 이미지 N"이 화면 수보다 작아도 정상이고, 확인하러 다시 열지 않아요. 리포트 구성과 예시는 `examples/sample-run/`과 `examples/sample-compare/`에 있어요.
+`build_report.py`는 `report.html`(이미지를 안에 담은 단일 파일, 외부 요청 없음)과 `RUN/report.md`를 써요(`--format html|md|both`, 기본 `both`). `build_compare.py`는 `compare.html`을 써요. 두 스크립트 모두 `--out 경로.html`로 HTML 위치를 정해요. **HTML 리포트는 반드시 바탕화면(`~/Desktop/<대상 이름>-report.html`, 비교 모드는 `~/Desktop/<대상 이름>-compare.html`)에 만들어요.** 바탕화면 경로가 다른 환경이면 그 환경의 바탕화면을 써요. `review.json`, `compare.json`, `report.md`, `capture.json`, `shots/`는 실행 폴더에 그대로 둬요. 두 HTML은 고정 틀이라 직접 쓰지 않고 내용(JSON)만 써요. 리포트의 지적 카드는 시니어가 옆에서 짚어 주는 순서예요: `pin`으로 잘라낸 위치 그림 → 문제(관찰과 영향, 이어진 가상 사용자 이름) → 이렇게 고쳐요(수정 전·후) → 고친 뒤 확인할 것 → 검토 기준(원칙의 검토 질문을 사람 말로). 원칙 영어 이름, 사례 번호, 지적 id는 리포트에 보이지 않아요. 심각도는 '개선 필요 / 개선 권장 / 사소한 의견'으로 보여요. 고쳤어요·문제 아님 표시는 지적 단위이고, 검토 전제는 접혀 있어요. 틀의 구조와 안전성은 테스트로 검증해 두었으니 매번 화면을 띄워 레이아웃을 다시 확인하지 않아요. 화면을 특정한 지적(흐름 지적 포함), 그 화면의 가상 반응, 잘 된 점은 모두 그 화면 블록 아래에 모여요. 아무것도 걸리지 않은 화면만 HTML에 이미지 없이 이름만 적혀요. 그래서 "내장 이미지 N"이 화면 수보다 작아도 정상이고, 확인하러 다시 열지 않아요. 리포트 구성과 예시는 `examples/sample-run/`과 `examples/sample-compare/`에 있어요.
 
 **리포트를 만들었으면 마지막 채팅 답은 짧게 해요.** 총평과 먼저 고칠 것(또는 순위)은 JSON을 쓰기 전에 이미 말했으니 되풀이하지 않고, 바탕화면의 리포트 경로, 검증 뒤 달라진 점(있을 때만), 확인하지 못한 것만 써요. 리포트 내용을 채팅에 다시 옮겨 쓰지 않아요.
 

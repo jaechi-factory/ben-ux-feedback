@@ -86,6 +86,7 @@ RUN/
 - 수량, 잘림, 크기는 직접 세어 확인한 것만 써요.
 - `principle`이 `null`이면 `case`도 비워요.
 - `run.writing_judge`가 `fallback`이면 문구 지적의 `confirm_needed`에 미적용 사실을 적어요(`writing.md`).
+- **메이커가 읽는 글**(`title`, `observation`, `why`, `fix`, `tobe`, `done_when`, `confirm_needed`, `evidence.where`, 화면 `screen_goal`·`verdict`, `strengths.note`, `checks_needed`, `summary.headline`, 가상 UT의 글)은 리포트에 그대로 나와요. 화면·지적 id(`n1234`, `F03`), 문구 규칙 코드(`UX-STATE-001`, `HF-11`), 사례 번호(`C177`), 영어 원칙 이름을 쓰지 않아요. 화면은 이름으로 부르고, 원칙은 `principle` 칸에만 적어요(리포트는 그 원칙의 검토 질문을 사람 말로 보여 줘요). 화면에 적힌 문구를 그대로 옮기는 `asis`는 예외예요.
 
 ### strengths[]
 지켜진 원칙과 화면 근거예요. 의례적인 칭찬은 쓰지 않아요.
@@ -184,6 +185,7 @@ RUN/
 | 오류(ut) | `mode`가 `virtual`이 아님, 페르소나 `id`가 비었거나 겹침, 페르소나의 `age_group`이 청년, 중년, 노년 밖, `device_level`이나 `ux_level`이 상, 중, 하 밖, 옛 필드 `age_band`나 `tech`가 있음, 페르소나와 walk가 1:1이 아님, 없는 `screen_id`, 세 축 값이 세 단계 밖, `quote` 비어 있음, 막힘인데 `cause`나 `finding_ids`가 없음, 없는 finding id, 이탈인데 `stopped_at`이나 `stop_reason`이 없음, 완주인데 둘이 있음, `from_ut`의 없는 페르소나, 숫자 값과 점수류 필드, `easy_screens`의 없는 화면이나 `steps`와 겹침이나 멈춘 화면 포함, `easy_screens` 없이 `steps`가 빈 목록 |
 | 오류 | 선택 필드 `done_when`이 문자열이 아님 |
 | 경고 | 심각 지적에 `done_when`이 없음 |
+| 경고 | 메이커가 읽는 글에 화면·지적 id, 문구 규칙 코드, 사례 번호, 영어 원칙 이름이 있음 |
 | 경고 | 화면 지적에 `pin`이 없음, `pin` 형식이 틀림(0~1 비율 숫자가 아니거나 `w`·`h`가 한쪽만 있음), 상자가 이미지 밖으로 나감(`x+w`나 `y+h`가 1 초과) |
 | 경고 | 보통인데 연결된 지적이 없음, 마지막 step이 `stopped_at`과 다름, `from_ut`로 표시했는데 그 walk에서 연결한 step이 없음 |
 | 경고 | 가상 UT 페르소나가 3명이 아니거나 연령대가 겹침(사용자가 인원이나 연령대를 정했다면 무시해도 돼요) |
@@ -327,65 +329,66 @@ RUN/
 
 ## 마크다운 출력 형식 (채팅 전용)
 
-`review.json`을 쓸 수 없는 환경에서 써요. 필드는 JSON과 같지만 읽기 좋게 재배치해요. 총평(`summary`)과 검토 조건(`run`)을 맨 위에 두고, 지적은 `severity`를 제목 앞에 두고, `evidence.where`는 "화면" 줄로 올려요. 지적은 심각, 중간, 낮음 순으로 정렬해요. 값이 없는 선택 필드의 줄은 빼요.
+`review.json`을 쓸 수 없는 환경에서 써요. `scripts/build_report.py`가 만드는 `report.md`도 같은 형식이에요. 필드는 JSON과 같지만 메이커가 읽기 좋게 재배치해요. 총평(`summary`)과 리뷰 조건(`run`)을 맨 위에 두고, 지적은 심각도 이름을 제목 앞에 두고, `evidence.where`는 "화면" 줄로 올려요. 지적은 개선 필요(심각), 개선 권장(중간), 사소한 의견(낮음) 순으로 정렬해요. 값이 없는 선택 필드의 줄은 빼요. HTML 리포트와 같은 규칙으로 화면·지적 id, 원칙 영어 이름, 사례 번호, 렌즈와 근거 유형은 쓰지 않아요. 화면은 이름으로, 원칙은 그 검토 질문(해요체)으로 보여 줘요.
 
 ```markdown
 ## 총평
 **{summary.headline}**
-먼저 고칠 것: {summary.top의 id와 title, 심각 먼저, 최대 3개}
+먼저 고칠 것: {summary.top의 title, 개선 필요 먼저, 최대 3개}
 
-검토 조건: 입력 {run.input_type} · 문구 판정 {run.writing_judge}
+화면 {화면 수}개 · 지적 {지적 수}개 · 개선 필요 {심각 수}개
+리뷰 조건: {입력 방식} 화면으로 리뷰했어요. {문구 판정 방식}.
 제품 핵심 가치: {run.product_value}
 목표: {run.goal}
-제외 규칙: {run.exclusions}
+리뷰에서 뺀 것: {run.exclusions를 쉬운 말로. curly-braces는 "중괄호 {} 표기는 실제 값이 들어갈 자리로 봤어요", dummy-amount-mismatch는 "화면마다 다른 더미 금액은 보지 않았어요"}
 
 ## 화면
-### {screens.name} (`{screens.id}`)
+### {screens.name}
 - 화면 목표: {screen_goal}
 - 한 줄 진단: {verdict}
 
 ## 지적
-### [{severity}] {id} {title}  (렌즈: {lens})
-- 화면: {screen_id} · {evidence.where} (근거 유형: {evidence.type})
-- 관찰: {observation}
+### [{개선 필요 | 개선 권장 | 사소한 의견}] {title}
+- 화면: {화면 이름} · {evidence.where} ({문구 | 화면 사이 흐름 | 접근성}, 화면 렌즈면 빼요)
+- 문제: {observation}
 - 왜 문제인가: {why}
-- 근거 원칙: {principle} {case}
-- 제안: {fix}
+- 이렇게 고쳐요: {fix}
 - 수정 전: {asis}
 - 수정 후: {tobe}
-- 고쳤는지 확인하는 기준: {done_when}
-- 확인 필요: {confirm_needed}
-- 가상 UT에서 나온 지적: {from_ut의 이름}
+- 고친 뒤 확인할 것: {done_when}
+- 화면만으로는 알 수 없는 것: {confirm_needed}
+- 검토 기준: {principle의 가이드라인 4절 질문, 해요체}
+- 가상 사용자 반응: {이어진 페르소나 이름}
 
-## 가상 UT (실제 사용자 조사가 아니라 화면을 보고 추론한 가상 반응이에요)
+## 가상 사용자 (화면 이미지만 보고 추론한 반응이에요)
 페르소나를 이렇게 골랐어요: {고른 이유 한 줄}
 
-### 페르소나
-- {name} (`{id}`, {age_group}, 디바이스 적응도 {device_level}, UX 이해도 {ux_level}): {traits} 목표: {goal}
+### 사람
+- {name} ({age_group} · 휴대폰 조작 {능숙|보통|서툼} · 앱 이해 {능숙|보통|서툼}): {traits} 목표: {goal}
 
-### {name}: {outcome}  (이탈이면 `{stopped_at}`에서 멈춤, 이유: {stop_reason})
-| 화면 | 디바이스 | 시안 이해 | 문구 이해 | 한마디 |
+### {name}: {outcome}  (이탈이면 {멈춘 화면 이름}에서 멈춤, 이유: {stop_reason})
+| 화면 | 조작 | 화면 이해 | 문구 이해 | 한마디 |
 |---|---|---|---|---|
-| {screens.name} (`{screen_id}`) | {device} | {design} | {writing} | "{quote}" {막힘이면 원인: cause} |
+| {화면 이름} | {device} | {design} | {writing} | "{quote}" {막힘이면 원인: cause} |
 
 나머지는 세 가지 모두 쉬움: {easy_screens의 화면 이름들} (있을 때만)
 
 ### 반응에서 나온 지적
-- {name} · {screens.name}: {막힘 또는 보통인 축} → {finding id} {title}
+- {name} · {화면 이름}: {막힘 또는 보통인 축} → {지적 title}
 
 ## 잘 된 점
-- {note} ({principle}, {screen_id})
+- {note} ({화면 이름}, 화면이 없으면 빼요)
 
-## 확인 필요
+## 확인이 필요한 것
 - {what}: {how}
 ```
 
-`scripts/build_report.py`가 만드는 `report.md`는 끝에 "남은 지적 체크리스트"를 붙여요(`- [ ]` 형식, 지적마다 고치는 방법과 `done_when`을 하위 줄로). 이 파일은 화면에서 읽어 온 글이 들어가므로 마크다운 문법 문자(`[ ] ( ) ! * _` 와 백틱)를 이스케이프하고 `http://`, `https://`는 자동 링크가 되지 않게 끊어요.
+`report.md`는 끝에 "남은 지적 체크리스트"를 붙여요(`- [ ] [심각도 이름] 제목 (화면 이름)` 형식, 지적마다 고치는 방법과 `done_when`을 하위 줄로). 이 파일은 화면에서 읽어 온 글이 들어가므로 마크다운 문법 문자(`[ ] ( ) ! * _` 와 백틱)를 이스케이프하고 `http://`, `https://`는 자동 링크가 되지 않게 끊어요.
 
-- `screen_id`가 `null`인 흐름 지적은 화면 줄에 "여러 화면에 걸친 흐름"이라고 쓰고 `evidence.where`에 진입 화면을 적어요.
-- 원칙이 `null`이면 "근거 원칙" 줄을 빼요.
-- 가상 UT 절은 `ut`가 있을 때만 쓰고, 표 안에는 쉬움, 보통, 막힘만 적어요. 수치(완주율, 점수, 시간)는 쓰지 않아요. 이탈한 사람은 표가 멈춘 화면에서 끝나요.
-- 채팅은 길이가 길면 읽기 어려우니, 중간과 낮음이 많으면 제목과 제안만 표로 줄이고 심각은 전체 필드를 써요.
+- `screen_id`가 `null`인 흐름 지적은 화면 줄에 "화면 사이 흐름"이라고 쓰고 `evidence.where`에 진입 화면을 적어요.
+- 원칙이 `null`이면 "검토 기준" 줄을 빼요.
+- 가상 사용자 절은 `ut`가 있을 때만 쓰고, 표 안에는 쉬움, 보통, 막힘만 적어요. 수치(완주율, 점수, 시간)는 쓰지 않아요. 이탈한 사람은 표가 멈춘 화면에서 끝나요.
+- 채팅은 길이가 길면 읽기 어려우니, 개선 권장과 사소한 의견이 많으면 제목과 "이렇게 고쳐요"만 표로 줄이고 개선 필요는 전체 줄을 써요.
 - 검증기를 돌리지 못했다면 마지막에 "검증 스크립트는 실행하지 못했어요"라고 밝혀요.
 
 ### 비교 모드 (채팅 전용)

@@ -337,8 +337,9 @@ class ValidateTest(RunCase):
         self.assertEqual(pb({"pin": {"x": 1.0, "y": 0.4, "w": 0.5, "h": 0.5}})[2:], (None, None))   # 남는 폭이 0이면 점
         for bad in ({"x": "a", "y": 0.1}, {"x": True, "y": 0.1}, {"x": float("nan"), "y": 0.1}, "x", None):
             self.assertIsNone(pb({"pin": bad}), repr(bad))
-        self.assertEqual(build_report.pin_point((0.2, 0.2, 0.4, 0.2)), (0.4, 0.3))
+        self.assertEqual(build_report.pin_point((0.2, 0.2, 0.4, 0.2)), (0.2, 0.3))   # 상자 왼쪽 변 가운데
         self.assertEqual(build_report.pin_point((0.2, 0.2, None, None)), (0.2, 0.2))
+        self.assertEqual(build_report.pin_point((0.0, 0.0, 1.0, 0.02)), (0.06, 0.04))   # 가장자리에서 안 잘리게
 
     def test_asis_must_appear_in_aux_text_when_available(self):
         rev = good_review()
@@ -427,6 +428,26 @@ def good_ut():
                               "quote": "저장은 어디서 하는 거예요?",
                               "cause": "저장 버튼이 키보드에 가려졌어요", "finding_ids": ["F01"]}]}],
     }
+
+
+class ReaderTextTest(RunCase):
+    def test_internal_marks_in_reader_text_warn(self):
+        rev = good_review()
+        rev["findings"][0]["why"] = "home 화면에서 Clear Action 위반이에요(UX-STATE-001, HF-11, F01)."
+        rev["findings"][0]["asis"] = "home"   # 화면 문구 인용은 검사하지 않아요
+        _errors, warns = self.run_check(rev)
+        hit = [w for w in warns if "findings[F01].why" in w and "내부 표기" in w]
+        self.assertEqual(len(hit), 1, warns)
+        for mark in ("'F01'", "'HF-11'", "'UX-STATE-001'"):
+            self.assertIn(mark, hit[0])
+        self.assertFalse(any("findings[F01].asis" in w for w in warns))
+        _errors, warns = self.run_check(good_review())
+        self.assertFalse(any("내부 표기" in w for w in warns), warns)
+        marks = validate.internal_marks
+        self.assertEqual(marks("사례 C177처럼 HF-11을 봐요", set(), set(), set()), ["C177", "HF-11"])
+        self.assertEqual(marks("123:456 화면이에요", {"123:456"}, set(), set()), ["123:456"])
+        self.assertEqual(marks("버튼이 1개뿐이고 home 화면이에요", {"1", "home"}, set(), set()), [])
+        self.assertEqual(marks("비율 1:2로, 오후 12:30까지", {"1:2", "12:30"}, set(), set()), [])
 
 
 class UtValidateTest(RunCase):
@@ -625,7 +646,7 @@ class ReportTest(RunCase):
         self.put_review(rev)
         build_report.build(self.run_dir)
         html = self.read("report.html")
-        self.assertIn("세 가지 모두 쉬움", html)
+        self.assertIn("세 가지 모두 쉬웠던 사람", html)
         self.assertNotIn("걷지 않았어요", html)
         self.assertIn("나머지는 세 가지 모두 쉬움: 월간", self.read("report.md"))
 
@@ -637,7 +658,7 @@ class ReportTest(RunCase):
         self.put_review(rev)
         build_report.build(self.run_dir)
         html = self.read("report.html")
-        self.assertIn("세 가지 모두 쉬움", html)
+        self.assertIn("세 가지 모두 쉬웠던 사람", html)
         self.assertIn("<b>완주</b>", html)
         md = self.read("report.md")
         self.assertNotIn("| 화면 | 디바이스 |", md)
@@ -702,17 +723,13 @@ class ReportTest(RunCase):
             build_report.build(self.run_dir, "html")
         self.assertNotIn("이미지를 넣지 못한", buf.getvalue())
 
-    def test_html_has_csp_aria_table_roles_and_four_multiple_padding(self):
+    def test_html_has_csp_and_four_multiple_padding(self):
         self.put_review(self.ut_review())
         build_report.build(self.run_dir, "html")
         doc = self.read("report.html")
         self.assertIn('<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; '
                       'img-src data:; style-src \'unsafe-inline\'; script-src \'unsafe-inline\'">', doc)
         self.assertLess(doc.index("Content-Security-Policy"), doc.index("<style>"))
-        table = doc.split('<table class="ut-table')[1].split("</table>")[0]
-        for needle in ('role="table"', '<thead role="rowgroup">', '<tbody role="rowgroup">', '<tr role="row">',
-                       'role="columnheader"', 'role="rowheader"', '<td role="cell"'):
-            self.assertIn(needle, table)
         self.assertIsNone(re.search(r"padding:2px", doc))
         for px in re.findall(r"padding:(\d+)px", doc):
             self.assertEqual(int(px) % 4, 0, px)
@@ -736,9 +753,14 @@ class ReportTest(RunCase):
         self.assertEqual([os.path.basename(p) for p in written], ["report.html", "report.md"])
         md = self.read("report.md")
         self.assertIn("## 총평", md)
-        self.assertIn("### [심각] F01 저장 버튼이 가려져요", md)
-        self.assertIn("## 가상 UT", md)
-        self.assertIn("| 홈 (`home`) | 막힘 | 보통 | 쉬움 |", md)
+        self.assertIn("### [개선 필요] 저장 버튼이 가려져요", md)
+        self.assertIn("## 가상 사용자", md)
+        self.assertIn("| 화면 | 조작 | 화면 이해 | 문구 이해 | 한마디 |", md)
+        self.assertIn("| 홈 | 막힘 | 보통 | 쉬움 |", md)
+        # HTML과 같은 규칙: 지적 id, 영어 원칙 이름, 화면 id는 마크다운에도 보이지 않아요
+        for mark in ("F01", "Clear Action", "`home`", "렌즈", "근거 유형"):
+            self.assertNotIn(mark, md.split("## 남은 지적")[0])
+        self.assertIn("- 검토 기준: 누르면 무슨 일이 생기는지 버튼만 봐도 아나요?", md)
         self.assertIn("### 반응에서 나온 지적", md)
         self.assertIn("박순자", md)
 
@@ -784,7 +806,7 @@ class ReportTest(RunCase):
         self.put_review(rev)
         build_report.build(self.run_dir, "md")
         line = [x for x in self.read("report.md").splitlines() if x.startswith("먼저 고칠 것:")][0]
-        self.assertEqual(line, "먼저 고칠 것: F04 지적 4, F02 지적 2, F05 지적 5")
+        self.assertEqual(line, "먼저 고칠 것: 지적 4, 지적 2, 지적 5")
         m = build_report.Model(rev, {})
         self.assertEqual([f["id"] for f in build_report.top_findings(m)], ["F04", "F02", "F05"])
 
@@ -798,9 +820,7 @@ class ReportTest(RunCase):
         self.put_review(good_review())
         build_report.build(self.run_dir)
         doc, md = self.read("report.html"), self.read("report.md")
-        for needle in ('id="ut"', "가상 사용자 반응", "실제 조사 아님", "ut-table"):
-            if needle == "ut-table":
-                needle = '<table class="ut-table'
+        for needle in ('id="ut"', "가상 사용자 반응", "실제 조사 아님"):
             self.assertNotIn(needle, doc)
         self.assertNotIn("가상 UT", md)
 
@@ -809,10 +829,13 @@ class ReportTest(RunCase):
         build_report.build(self.run_dir, "html")
         doc = self.read("report.html")
         self.assertIn('id="ut"', doc)
-        self.assertIn("가상 사용자 반응 · 실제 조사 아님", doc)
+        self.assertIn("가상 사용자 반응", doc)
+        self.assertIn("화면 이미지만 보고 추론했어요", doc)
+        self.assertNotIn("실제 조사 아님", doc)
         self.assertIn("박순자", doc)
-        self.assertIn('<table class="ut-table', doc)
-        for word in ("디바이스", "시안", "라이팅", "막힘", "보통", "쉬움"):
+        self.assertIn('id="ut-r-p-senior-dlo-ulo-home"', doc)
+        self.assertNotIn("<table", doc)
+        for word in ("조작", "화면 이해", "문구 이해", "막힘", "보통", "쉬움"):
             self.assertIn(word, doc)
         self.assertIn('href="#f-F01"', doc)
         self.assertIn('id="f-F01"', doc)
@@ -856,20 +879,21 @@ class ReportTest(RunCase):
         self.assertIn('data-x="0.5000" data-y="0.5000"', c2)
         self.assertNotIn("data-w", c2)
         self.assertIn('class="pin"', c2)
-        # 같은 한마디는 첫 번째로 이어진 지적(F01)에만, F02에는 이름만
-        self.assertIn("저장은 어디서 하는 거예요?", c1)
-        self.assertNotIn("저장은 어디서 하는 거예요?", c2)
-        self.assertIn("여기서도 막힌 사람", c2)
-        self.assertEqual(doc.count("저장은 어디서 하는 거예요?"), 2)   # F01 카드 + 가상 UT 표
-        # 원칙 칩 옆 검토 질문, 같은 원칙끼리 연결
-        self.assertIn("완료에 필요한 행동이 한눈에 보이는가?", c1)
-        self.assertIn('같은 원칙에 걸린 지적: <a href="#f-F02">F02</a>', c1)
+        # 한마디는 화면 아래 반응 묶음에 한 번만, 카드에는 그 반응으로 가는 이름 링크만
+        for card in (c1, c2):
+            self.assertNotIn("저장은 어디서 하는 거예요?", card)
+            self.assertIn('<a href="#ut-r-p-senior-dlo-ulo-home">박순자</a>', card)
+        self.assertEqual(doc.count("저장은 어디서 하는 거예요?"), 1)
+        # 원칙은 영어 이름 없이 검토 기준 질문(해요체)으로만, 지적 id는 보이지 않아요
+        self.assertIn("<h5>검토 기준</h5><p>누르면 무슨 일이 생기는지 버튼만 봐도 아나요?</p>", c1)
+        self.assertNotIn("Clear Action", c1)
+        self.assertNotIn('class="fid"', doc)
         # 검토 전제는 접혀 있고, 입력·판정 방식은 맨 아래 한 줄
-        self.assertIn('<details class="meta-wrap"><summary>검토 전제 보기</summary>', doc)
+        self.assertIn('<details class="meta-wrap"><summary>리뷰 전제 보기</summary>', doc)
         self.assertLess(doc.index('class="foot-meta"'), doc.index("<script>"))
         self.assertNotIn("<dt>입력 방식</dt>", doc)
         self.assertNotIn("<dt>검토 목표</dt>", doc)   # 브리프 목표가 있으면 run.goal 줄은 빼요
-        self.assertIn("답해 주시면 더 정확해져요", doc)
+        self.assertIn("확인이 필요한 것", doc)
         self.assertNotIn("<h5>근거</h5>", doc)
 
     def test_missing_review_json_is_a_clean_error(self):
@@ -899,18 +923,18 @@ class ReportTest(RunCase):
         self.assertEqual([it["fid"] for it in items], ["F01", "F02"])
         md = build_report.render_checklist(items)
         self.assertIn("## 남은 지적 2개", md)
-        self.assertIn("- [ ] [심각] F01 저장 버튼이 가려져요 (홈)", md)
+        self.assertIn("- [ ] [개선 필요] 저장 버튼이 가려져요 (홈)", md)
         self.assertIn("  - 확인 기준: 키보드가 올라와도 '저장하기'가 보여요.", md)
-        self.assertIn("- [ ] [중간] F02 수정하는 길이 없어요 (여러 화면에 걸친 흐름)", md)
+        self.assertIn("- [ ] [개선 권장] 수정하는 길이 없어요 (화면 사이 흐름)", md)
         cleared = build_report.render_checklist(items, skip_fids={"F01"})
-        self.assertNotIn("F01", cleared)
-        self.assertIn("F02", cleared)
+        self.assertNotIn("저장 버튼이 가려져요", cleared)
+        self.assertIn("수정하는 길이 없어요", cleared)
         self.assertEqual(build_report.render_checklist(items, skip_fids={"F01"}).count("- [ ]"), 1)
         self.put_review(rev)
         build_report.build(self.run_dir, "md")
         report = self.read("report.md")
-        self.assertIn("- 고쳤는지 확인하는 기준: 키보드가 올라와도", report)
-        self.assertIn("- [ ] [심각] F01", report)
+        self.assertIn("- 고친 뒤 확인할 것: 키보드가 올라와도", report)
+        self.assertIn("- [ ] [개선 필요] 저장 버튼이 가려져요", report)
 
     def test_checklist_text_is_neutralized_and_embedded_safely(self):
         rev = self.ut_review()
@@ -928,12 +952,13 @@ class ReportTest(RunCase):
         self.assertRegex(doc, r'<button type="button"[^>]*data-copy="checklist"[^>]*>남은 지적을 체크리스트로 복사</button>')
         self.assertIn('id="cl-fallback"', doc)
 
-    def test_copy_button_next_to_tobe_is_native_and_named(self):
+    def test_tobe_has_no_copy_button_and_checklist_copy_stays(self):
         self.put_review(good_review())
         build_report.build(self.run_dir, "html")
         doc = self.read("report.html")
-        self.assertRegex(doc, r'<p id="tobe-F01">키보드 위에')
-        self.assertRegex(doc, r'<button type="button" class="btn small" data-copy="tobe-F01" aria-label="F01 수정 후 문구 복사">복사</button>')
+        self.assertIn("<p>키보드 위에", doc)
+        self.assertNotIn('data-copy="tobe-', doc)
+        self.assertIn('data-copy="checklist"', doc)
         self.assertIn("navigator.clipboard", doc)
         self.assertIn("selectNodeContents", doc)
 
@@ -966,26 +991,19 @@ class ReportTest(RunCase):
         build_report.build(self.run_dir, "html")
         doc = self.read("report.html")
         card = doc.split('id="f-F01"')[1]
-        order = [card.index(x) for x in ('class="crop"', "무엇이 문제인가", "사용자에게 생기는 일", "Clear Action",
-                                         "이렇게 고쳐요", "고쳤는지 확인하는 기준", 'class="card-actions"')]
+        order = [card.index(x) for x in ('class="crop"', "<h5>문제</h5>", "<h5>이렇게 고쳐요</h5>",
+                                         "<h5>고친 뒤 확인할 것</h5>", "<h5>검토 기준</h5>", 'class="card-actions"')]
         self.assertEqual(order, sorted(order))
-        self.assertIn("화면 위치", card)
-        self.assertIn('href="https://toss.im/simplicity/sessions/when-ux-ignores-blind-users"', card)
-        self.assertIn("사례 C177", card)
-        rev["findings"][0].pop("case")
+        # 위치 글은 그림이 그려지면 CSS로 숨겨요. 사례 번호와 원칙 영어 이름은 내부 검증용이라 보이지 않아요
+        self.assertIn('<p class="where">위치: 화면 하단</p>', card)
+        self.assertIn(".crop.ok~.part .where{display:none}", doc)
+        self.assertNotIn("C177", doc)
+        self.assertNotIn("Clear Action", card.split("</article>")[0])
         del rev["findings"][0]["done_when"]
         self.put_review(rev)
         build_report.build(self.run_dir, "html")
         doc = self.read("report.html")
-        self.assertNotIn("사례 C", doc)
-        self.assertNotIn("고쳤는지 확인하는 기준", doc)
-
-    def test_case_index_reads_title_and_url(self):
-        idx = build_report.load_case_index()
-        title, url = idx["C177"]
-        self.assertIn("'선택' 버튼", title)
-        self.assertTrue(url.startswith("https://"))
-        self.assertEqual(build_report.load_case_index(os.path.join(self.tmp, "none.md")), {})
+        self.assertNotIn("고친 뒤 확인할 것", doc)
 
     def test_avatars_are_inline_distinct_and_self_contained(self):
         icons = {a: build_report.avatar(a) for a in ("청년", "중년", "노년")}
@@ -1020,7 +1038,7 @@ class ReportTest(RunCase):
             self.assertIsNone(re.search(r"#[0-9A-Fa-f]{3,8}|rgb|fill=|stroke=", svg), svg[:80])
             self.assertTrue(all(ord(ch) < 0x2E80 or 0xAC00 <= ord(ch) <= 0xD7A3 for ch in svg))
 
-    def test_persona_icons_in_cards_table_and_bubbles_with_virtual_label(self):
+    def test_persona_icons_in_cards_and_screen_reactions_with_virtual_label(self):
         self.put_review(self.ut_review())
         build_report.build(self.run_dir, "html")
         doc = self.read("report.html")
@@ -1029,19 +1047,64 @@ class ReportTest(RunCase):
         persona = doc.split('id="ut-p-p-senior-dlo-ulo"')[1].split("</li>")[0]
         self.assertIn(hidden, persona)
         self.assertNotIn("aria-label", persona.split("<h3>")[0])
-        table = doc.split('<table class="ut-table')[1].split("</table>")[0]
-        self.assertIn(hidden, table)
-        self.assertNotIn("노년 사용자", table)
-        self.assertIn("노년 · 디바이스 하 · UX 이해도 하", table)
+        react = doc.split('id="ut-r-p-senior-dlo-ulo-home"')[1].split("</section>")[0]
+        self.assertIn(hidden, react)
+        self.assertNotIn("노년 사용자", react)
+        self.assertIn("노년 · 휴대폰 조작 서툼 · 앱 이해 서툼", react)
+        self.assertIn("저장은 어디서 하는 거예요?", react)
+        self.assertIn("여기서 멈췄어요", react)
+        self.assertIn('href="#ut-p-p-senior-dlo-ulo"', react)
         card = doc.split('id="f-F01"')[1].split("</article>")[0]
-        self.assertIn('class="bubble"', card)
-        self.assertIn(hidden, card)
-        self.assertNotIn("노년 사용자", card)
-        self.assertIn("박순자", card)
-        self.assertIn("노년 · 디바이스 하 · UX 이해도 하", card)
-        self.assertIn("저장은 어디서 하는 거예요?", card)
-        self.assertIn("가상 사용자 반응 · 실제 조사 아님", card)
-        self.assertIn('href="#ut-p-p-senior-dlo-ulo"', card)
+        self.assertNotIn('class="bubble"', card)
+        self.assertIn("가상 사용자 반응:", card)
+        self.assertIn('<a href="#ut-r-p-senior-dlo-ulo-home">박순자</a>', card)
+
+    def test_everything_about_a_screen_is_grouped_under_it(self):
+        rev = self.ut_review()
+        flow = copy.deepcopy(rev["findings"][0])
+        flow.update({"id": "F02", "severity": "중간", "lens": "흐름", "title": "저장 뒤 갈 곳이 없어요", "from_ut": []})
+        loose = copy.deepcopy(flow)
+        loose.update({"id": "F03", "screen_id": None, "title": "알림 뒤 복귀 경로가 없어요"})
+        rev["findings"] += [flow, loose]
+        rev["strengths"] = [{"note": "금액 칸이 먼저 보여요", "principle": None, "screen_id": "home"},
+                            {"note": "전체 흐름이 짧아요", "principle": None, "screen_id": None}]
+        self.put_review(rev)
+        build_report.build(self.run_dir, "html")
+        doc = self.read("report.html")
+        home = doc.split('id="sec-home"')[1].split('<section class="block"')[0]
+        for needle in ('id="f-F01"', 'id="f-F02"', 'id="ut-r-p-senior-dlo-ulo-home"', "금액 칸이 먼저 보여요"):
+            self.assertIn(needle, home)
+        for needle in ('id="f-F03"', "전체 흐름이 짧아요"):
+            self.assertNotIn(needle, home)
+        self.assertIn('id="f-F03"', doc.split('id="flow"')[1])
+        self.assertIn("전체 흐름이 짧아요", doc.split('id="strengths"')[1])
+
+    def test_revisited_screen_keeps_every_reaction_and_stop_link_needs_a_step(self):
+        rev = self.ut_review()
+        w = rev["ut"]["walks"][0]
+        first = {"screen_id": "home", "device": "쉬움", "design": "쉬움", "writing": "보통",
+                 "quote": "처음엔 괜찮았어요", "finding_ids": []}
+        w["steps"].insert(0, first)
+        rev["findings"][0].pop("from_ut")   # 두 번째 방문에서만 이어진 지적도 카드에 이름 링크가 있어야 해요
+        self.put_review(rev)
+        build_report.build(self.run_dir, "html")
+        doc = self.read("report.html")
+        home = doc.split('id="sec-home"')[1].split('<section class="block"')[0]
+        self.assertIn("처음엔 괜찮았어요", home)
+        self.assertIn("저장은 어디서 하는 거예요?", home)
+        self.assertEqual(doc.count('id="ut-r-p-senior-dlo-ulo-home"'), 1)
+        card = doc.split('id="f-F01"')[1].split("</article>")[0]
+        self.assertIn('<a href="#ut-r-p-senior-dlo-ulo-home">박순자</a>', card)
+        # 멈춘 표시는 그 화면의 마지막(막힌) 반응에만
+        self.assertIn("여기서 멈췄어요", home.split("처음엔 괜찮았어요")[1])
+        self.assertNotIn("여기서 멈췄어요", home.split("처음엔 괜찮았어요")[0])
+        # 멈춘 화면에 그 사람의 반응이 없으면 이탈 화면 이름은 링크가 아니에요
+        w["stopped_at"] = "nowhere"
+        rev["screens"].append({"id": "nowhere", "name": "어딘가", "shot": "shots/home.png",
+                               "screen_goal": "-", "verdict": "문제없어요."})
+        self.put_review(rev)
+        build_report.build(self.run_dir, "html")
+        self.assertNotIn('href="#ut-r-p-senior-dlo-ulo-nowhere"', self.read("report.html"))
 
     def test_card_has_no_reactions_without_linked_personas(self):
         rev = self.ut_review()
@@ -1052,7 +1115,7 @@ class ReportTest(RunCase):
         build_report.build(self.run_dir, "html")
         card = self.read("report.html").split('id="f-F01"')[1].split("</article>")[0]
         self.assertNotIn('class="bubble"', card)
-        self.assertNotIn("실제 조사 아님", card)
+        self.assertNotIn("가상 사용자 반응", card)
 
     def test_sample_run_validates_and_builds(self):
         src = os.path.join(SKILL, "examples", "sample-run")
@@ -1068,8 +1131,8 @@ class ReportTest(RunCase):
         with open(os.path.join(dst, "report.html"), encoding="utf-8") as fh:
             doc = fh.read()
         self.assertIn("data:image/svg+xml;base64,", doc)
-        self.assertIn("빠진 흐름·분기", doc)
-        self.assertIn("실제 조사 아님", doc)
+        self.assertIn("화면 사이에서 빠진 흐름", doc)
+        self.assertIn("가상 사용자 반응", doc)
 
     def test_sample_run_matches_example_doc_and_walk_is_consistent(self):
         ex = os.path.join(SKILL, "examples")
@@ -1180,7 +1243,7 @@ class BriefTest(RunCase):
             md = fh.read()
         self.assertIn("해결하려는 문제", doc)
         self.assertIn("&lt;b&gt;가계부&lt;/b&gt;", doc)
-        self.assertIn("화면에서 추론했어요", doc)
+        self.assertIn("화면을 보고 추론했어요", doc)
         self.assertIn("해결하려는 문제: 기록을 안 해요", md)
 
 

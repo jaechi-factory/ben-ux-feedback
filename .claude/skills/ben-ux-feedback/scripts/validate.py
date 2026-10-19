@@ -25,7 +25,7 @@ KNOWN_EXCLUSIONS = ("curly-braces", "dummy-amount-mismatch")
 # 리뷰 전에 받는 맥락(브리프). SKILL.md 0단계의 질문 순서와 같다.
 BRIEF_FIELDS = (("product", "어떤 제품인가요"), ("objective", "달성하려는 목표"), ("problem", "해결하려는 문제"),
                 ("cause", "이 문제를 겪는 이유"),
-                ("solution", "해결 방법"), ("user_value", "유저 기대효과"), ("business_value", "회사 기대효과"))
+                ("solution", "해결 방법"), ("user_value", "사용자 기대효과"), ("business_value", "회사 기대효과"))
 BRIEF_SOURCES = ("user", "inferred", "mixed")
 SHOT_EXT = (".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg")
 
@@ -43,6 +43,9 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_GUIDELINE = os.path.join(HERE, "..", "references", "guideline.md")
 DEFAULT_CASES = os.path.join(HERE, "..", "references", "cases.md")
 
+# 메이커가 읽는 글에 남으면 안 되는 내부 표기: 문구 규칙 코드, 사례 번호
+# 한글 조사가 바로 붙어도 잡히게 \b 대신 영문·숫자 기준 앞뒤 조건을 쓴다("C177처럼", "HF-11을")
+INTERNAL_CODE = re.compile(r"(?<![A-Za-z0-9-])(?:UX-[A-Z]+-\d{3}|HF-\d{2}|C\d{3})(?![A-Za-z0-9])")
 ABSTRACT_FIX = re.compile(r"(명확히\s*(보여|표시|드러)|강조해|정리해|개선해)")
 # 부재 주장("없어요", "안 보여요")과, 화면을 훑고 비슷한 요소의 위치를 적은 흔적
 ABSENCE_CLAIM = re.compile(r"(없어요|없습니다|안\s*보여요|안\s*보입니다|보이지\s*않아요|빠져\s*있어요|빠져\s*있습니다|빠져요)")
@@ -347,6 +350,60 @@ def check_ut(ut, screens, fids, errors, warns):
     return linked
 
 
+def reader_texts(rev):
+    """리포트에서 메이커가 읽는 글(경로, 문자열). 화면 문구를 그대로 옮기는 asis는 뺀다."""
+    out = []
+    for f in rev.get("findings") or []:
+        if isinstance(f, dict):
+            tag = f"findings[{f.get('id')}]"
+            for k in ("title", "observation", "why", "fix", "tobe", "done_when", "confirm_needed"):
+                out.append((f"{tag}.{k}", f.get(k)))
+            ev = f.get("evidence")
+            out.append((f"{tag}.evidence.where", ev.get("where") if isinstance(ev, dict) else None))
+    for s in rev.get("screens") or []:
+        if isinstance(s, dict):
+            for k in ("screen_goal", "verdict"):
+                out.append((f"screens[{s.get('id')}].{k}", s.get(k)))
+    for i, st in enumerate(rev.get("strengths") or []):
+        if isinstance(st, dict):
+            out.append((f"strengths[{i}].note", st.get("note")))
+    for i, ck in enumerate(rev.get("checks_needed") or []):
+        if isinstance(ck, dict):
+            out += [(f"checks_needed[{i}].what", ck.get("what")), (f"checks_needed[{i}].how", ck.get("how"))]
+    summ = rev.get("summary")
+    if isinstance(summ, dict):
+        out.append(("summary.headline", summ.get("headline")))
+    ut = rev.get("ut")
+    if isinstance(ut, dict):
+        for p in ut.get("personas") or []:
+            if isinstance(p, dict):
+                out += [(f"ut.personas[{p.get('id')}].{k}", p.get(k)) for k in ("traits", "goal")]
+        for w in ut.get("walks") or []:
+            if isinstance(w, dict):
+                out.append((f"ut.walks[{w.get('persona_id')}].stop_reason", w.get("stop_reason")))
+                for st in w.get("steps") or []:
+                    if isinstance(st, dict):
+                        out += [(f"ut.walks[{w.get('persona_id')}].{st.get('screen_id')}.{k}", st.get(k))
+                                for k in ("quote", "cause")]
+    return [(where, v) for where, v in out if isinstance(v, str) and v.strip()]
+
+
+def internal_marks(text, screen_ids, finding_ids, principles):
+    """글 속 내부 표기(화면·지적 id, 규칙 코드·사례 번호, 영어 원칙 이름)를 찾는다."""
+    hits = [m.group(0) for m in INTERNAL_CODE.finditer(text)]
+    for x in sorted(screen_ids | finding_ids):
+        # 글자와 숫자가 섞였거나 콜론이 든 id만 본다(F03, n1234, 123:456). 'home'처럼 화면 이름과 같은 id,
+        # '1'처럼 숫자뿐인 id는 보통 글과 구분할 수 없어서 건너뛴다
+        # 콜론 id는 '1:2' 비율이나 '12:30' 시각과 헷갈리지 않게 여섯 자 이상만 본다
+        ok = re.match(r"^[A-Za-z0-9_:;-]+$", x) and ((":" in x and len(x) >= 6)
+                                                    or (re.search(r"[A-Za-z]", x) and re.search(r"\d", x)))
+        if ok and re.search(rf"(?<![A-Za-z0-9_:;-]){re.escape(x)}(?![A-Za-z0-9_:;-])", text):
+            hits.append(x)
+    low = text.casefold()
+    hits += [p for p in sorted(principles) if re.search(rf"(?<![a-z]){re.escape(p)}(?![a-z])", low)]
+    return hits
+
+
 def check(rev, cap, run, principles, cases):
     """review(dict)를 검사해 (errors, warns)를 돌려준다. cap은 capture.json dict 또는 None."""
     errors, warns = [], []
@@ -631,6 +688,13 @@ def check(rev, cap, run, principles, cases):
                     for pid in fu:
                         if isinstance(pid, str) and pid in ut_pids and (pid, f["id"]) not in linked:
                             warns.append(f"findings[{f['id']}]: from_ut의 '{pid}' walk에서 이 지적을 연결한 step이 없어요")
+
+    # 메이커가 읽는 글에 내부 표기가 남았는지(리포트는 이 글을 그대로 보여 줘요)
+    for where, text in reader_texts(rev):
+        hits = internal_marks(text, set(screens), set(fids), principles)
+        if hits:
+            warns.append(f"{where}: 메이커가 읽는 글에 내부 표기 {sorted(set(hits))[:3]}가 있어요. "
+                         "화면 이름이나 쉬운 말로 바꾸세요(원칙은 principle 칸에만)")
 
     return errors, warns
 
