@@ -39,6 +39,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_CASES = os.path.join(HERE, "..", "references", "cases.md")
 AGE_KEYS = {"청년": "youth", "중년": "mid", "노년": "senior"}
 AGE_ALT = {"청년": "청년 사용자", "중년": "중년 사용자", "노년": "노년 사용자"}
+LENS_ORDER = {"화면": 0, "흐름": 1, "문구": 2, "접근성": 3}
+DEFAULT_GUIDELINE = os.path.join(HERE, "..", "references", "guideline.md")
 
 
 # ── 공통 도우미 ──
@@ -97,19 +99,57 @@ def data_uri(path):
         return f"data:{mime};base64," + base64.b64encode(fh.read()).decode("ascii")
 
 
-def pin_xy(f):
+def pin_box(f):
+    """pin {x, y[, w, h]}: 화면 이미지 안 위치를 0~1 비율로. w, h가 있으면 (x, y)는 상자의 왼쪽 위이고,
+    없으면 (x, y)는 점이다. 값이 잘못됐으면 None, w·h가 한쪽만 있거나 0이면 점으로 본다."""
     p = f.get("pin")
     if not isinstance(p, dict):
         return None
-    x, y = p.get("x"), p.get("y")
-    for v in (x, y):
+    out = []
+    for k in ("x", "y", "w", "h"):
+        v = p.get(k)
+        if v is None and k in ("w", "h"):
+            out.append(None)
+            continue
         if isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v):
             return None
-    return min(max(x, 0), 1), min(max(y, 0), 1)
+        out.append(min(max(float(v), 0.0), 1.0))
+    if out[2] is None or out[3] is None or out[2] == 0 or out[3] == 0:
+        out[2] = out[3] = None
+    else:   # 상자가 이미지 밖으로 나가지 않게 자른다
+        out[2] = round(min(out[2], 1.0 - out[0]), 6)
+        out[3] = round(min(out[3], 1.0 - out[1]), 6)
+        if out[2] <= 0 or out[3] <= 0:
+            out[2] = out[3] = None
+    return tuple(out)
+
+
+def pin_point(box):
+    """썸네일 번호 핀을 찍을 점. 상자면 가운데, 점이면 그 점."""
+    x, y, w, h = box
+    return (round(x + w / 2, 6), round(y + h / 2, 6)) if w else (x, y)
 
 
 def sev_key(f):
     return SEV_ORDER.get(f.get("severity"), 3)
+
+
+def order_key(f):
+    """심각도 → 렌즈(화면, 흐름, 문구, 접근성) 순. 비슷한 지적이 흩어지지 않게 렌즈로 한 번 더 모은다."""
+    return (sev_key(f), LENS_ORDER.get(f.get("lens"), 9))
+
+
+def load_principle_questions(path=None):
+    """guideline.md 3절에서 {원칙 이름: 검토 질문 한 줄}을 읽는다. 파일이 없거나 깨져도 빈 표를 돌려준다."""
+    try:
+        with open(path or DEFAULT_GUIDELINE, encoding="utf-8") as fh:
+            text = fh.read()
+    except OSError:
+        return {}
+    out = {}
+    for mo in re.finditer(r"^- \*\*([^*\n]+)\*\*[^:\n]*:\s*([^\n?]*\?)", text, re.M):
+        out.setdefault(mo.group(1).strip(), mo.group(2).strip())
+    return out
 
 
 def load_case_index(path=None):
@@ -152,8 +192,9 @@ def top_findings(m):
 class Model:
     """review.json과 capture.json을 리포트용으로 정리한 읽기 전용 묶음."""
 
-    def __init__(self, rev, cap, cases=None):
+    def __init__(self, rev, cap, cases=None, questions=None):
         self.cases = cases if isinstance(cases, dict) else {}
+        self.questions = questions if isinstance(questions, dict) else load_principle_questions()
         self.rev = rev if isinstance(rev, dict) else {}
         self.cap = cap if isinstance(cap, dict) else {}
         self.run = self.rev.get("run") if isinstance(self.rev.get("run"), dict) else {}
@@ -168,13 +209,23 @@ class Model:
             return f.get("lens") != "흐름" and isinstance(f.get("screen_id"), str) and bool(f["screen_id"])
 
         self.flow = [f for f in self.findings if not in_screen(f)]
-        self.flow.sort(key=sev_key)
+        self.flow.sort(key=order_key)
         self.by_screen = {}
         for f in self.findings:
             if in_screen(f):
                 self.by_screen.setdefault(f["screen_id"], []).append(f)
         for lst in self.by_screen.values():
-            lst.sort(key=sev_key)
+            lst.sort(key=order_key)
+        # 같은 화면에서 같은 원칙에 걸린 지적끼리 서로 잇는다(비슷한 지적을 한 묶음으로 보게)
+        self.related = {}
+        for lst in self.by_screen.values():
+            by_p = {}
+            for f in lst:
+                if t(f.get("principle")) and t(f.get("id")):
+                    by_p.setdefault(f["principle"], []).append(f["id"])
+            for ids in by_p.values():
+                for fid in ids:
+                    self.related[fid] = [x for x in ids if x != fid]
         self.ut = self._ut()
 
     def _ut(self):
@@ -284,7 +335,9 @@ ul,ol{padding-left:24px}
 .hero h1{margin-top:0}
 .stats{list-style:none;padding:0;margin-top:32px;display:flex;flex-wrap:wrap;gap:4px 24px;font-size:var(--t6);color:var(--grey-700)}
 .stats b{color:var(--grey-900)}
-.meta{margin-top:24px;padding:24px;background:var(--grey-50);border-radius:16px;display:grid;gap:8px;font-size:var(--t6);color:var(--grey-700)}
+.meta-wrap{margin-top:24px}
+.meta-wrap summary{display:flex;align-items:center;min-height:44px;cursor:pointer;font-size:var(--t6);font-weight:700;color:var(--grey-900)}
+.meta{margin-top:8px;padding:24px;background:var(--grey-50);border-radius:16px;display:grid;gap:8px;font-size:var(--t6);color:var(--grey-700)}
 .meta div{display:flex;flex-wrap:wrap;gap:8px}
 .meta dt{font-weight:700;color:var(--grey-900)}
 .meta dd{margin:0}
@@ -298,14 +351,7 @@ ul,ol{padding-left:24px}
 .tools{margin-top:24px;display:flex;flex-wrap:wrap;align-items:center;gap:12px}
 .fallback{display:block;width:100%;margin-top:12px;min-height:160px;padding:16px;border:1px solid var(--grey-600);border-radius:12px;font:inherit;font-size:var(--t6);color:var(--grey-900);background:#FFFFFF}
 .jump{margin-top:32px;display:flex;flex-wrap:wrap;gap:8px 24px;font-size:var(--t6)}
-.filters{margin-top:32px;display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding-top:24px;border-top:1px solid var(--grey-200)}
-.filters .flabel{font-size:var(--t6);font-weight:700;color:var(--grey-900)}
-.chipbtn{font:inherit;font-size:var(--t6);min-height:44px;padding:0 16px;border-radius:999px;border:1px solid var(--grey-600);background:#FFFFFF;color:var(--grey-800);cursor:pointer}
-.chipbtn b{margin-left:8px}
-.chipbtn:hover:not(:disabled){background:var(--grey-100)}
-.chipbtn[aria-pressed="true"]{background:var(--grey-900);border-color:var(--grey-900);color:#FFFFFF}
-.chipbtn:disabled{opacity:.4;cursor:default}
-.filters:focus{outline:none}
+.foot-meta{margin-top:72px;padding-top:24px;border-top:1px solid var(--grey-200);font-size:var(--t7);color:var(--grey-600)}
 
 .badge{display:inline-flex;align-items:center;gap:8px;padding:4px 12px;border-radius:999px;font-size:var(--t6);line-height:var(--lh-body);font-weight:500;background:var(--grey-100);color:var(--grey-700)}
 .badge::before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor;flex:none}
@@ -318,10 +364,11 @@ ul,ol{padding-left:24px}
 
 .screen{margin-top:64px}
 .screen:first-of-type{margin-top:32px}
-.screen.hidden,.hidden{display:none!important}
+.hidden{display:none!important}
 .screen-head{display:flex;gap:32px;align-items:flex-start}
-.thumb{flex:0 0 200px}
-.pinbox{position:relative;display:block}
+.thumb{flex:0 0 240px}
+.pinbox{display:block;max-height:720px;overflow:auto;border-radius:16px}
+.pinin{position:relative;display:block}
 .pinbox img{display:block;width:100%;height:auto;border:1px solid var(--grey-300);border-radius:16px;background:var(--grey-50)}
 .pin{position:absolute;width:24px;height:24px;margin:-12px 0 0 -12px;border-radius:50%;background:var(--accent);color:#FFFFFF;font-size:var(--t7);line-height:24px;font-weight:700;text-align:center;box-shadow:0 0 0 2px #FFFFFF}
 .noimg{padding:24px;border:1px dashed var(--grey-400);border-radius:16px;text-align:center;color:var(--grey-700);font-size:var(--t6)}
@@ -329,19 +376,27 @@ ul,ol{padding-left:24px}
 .screen-info h3{margin:0}
 .screen-info p{margin-top:8px}
 .screen-info .sub{font-size:var(--t6);color:var(--grey-700)}
-.actions{margin-top:24px;display:flex;flex-wrap:wrap;gap:12px}
+.progress{margin-top:16px;font-size:var(--t6);color:var(--grey-700)}
 .btn{font:inherit;font-size:var(--t6);font-weight:500;min-height:44px;padding:0 16px;border-radius:12px;border:1px solid var(--grey-600);background:#FFFFFF;color:var(--grey-800);cursor:pointer}
 .btn:hover{background:var(--grey-100)}
 .btn.resolve{border-color:var(--green-900);color:var(--green-900)}
-.when-done{display:none}
-.screen.cls-resolve .when-open,.screen.cls-dismiss .when-open{display:none}
-.screen.cls-resolve .when-done,.screen.cls-dismiss .when-done{display:flex;align-items:center;flex-wrap:wrap;gap:12px}
-.done-dismiss{display:none}
-.screen.cls-dismiss .done-dismiss{display:inline-block}
-.screen.cls-dismiss .done-resolve{display:none}
+.crop{display:none;position:relative;margin-top:16px;overflow:hidden;max-width:100%;border:3px solid var(--red-500);border-radius:12px;background:var(--grey-50)}
+.crop.ok{display:block}
+.crop canvas{display:block;max-width:100%;height:auto}
+.crop .pin{background:var(--red-500)}
+.crop-note{display:none;margin-top:8px;font-size:var(--t7);color:var(--grey-600)}
+.crop.ok+.crop-note{display:block}
+.card-actions{margin-top:24px;padding-top:24px;border-top:1px solid var(--grey-200);display:flex;flex-wrap:wrap;align-items:center;gap:12px}
+.card .state,.card .act-undo{display:none}
+.card.cls-resolve,.card.cls-dismiss{background:var(--grey-50);border-left-color:var(--grey-300)}
+.card.cls-resolve>.part,.card.cls-dismiss>.part,.card.cls-resolve>.crop,.card.cls-dismiss>.crop,.card.cls-resolve>.crop-note,.card.cls-dismiss>.crop-note{display:none}
+.card.cls-resolve .card-actions,.card.cls-dismiss .card-actions{padding-top:0;border-top:0;margin-top:16px}
+.card.cls-resolve .act-open,.card.cls-dismiss .act-open{display:none}
+.card.cls-resolve .act-undo,.card.cls-dismiss .act-undo{display:inline-block}
+.card.cls-resolve .state-resolve,.card.cls-dismiss .state-dismiss{display:inline-block}
 
 .cards{margin-top:32px;display:grid;gap:24px}
-.card{padding:24px;border:1px solid var(--grey-200);border-left-width:4px;border-radius:16px;scroll-margin-top:24px}
+.card{min-width:0;padding:24px;border:1px solid var(--grey-200);border-left-width:4px;border-radius:16px;scroll-margin-top:24px}
 .card.c-sev-high{border-left-color:var(--red-500)}
 .card.c-sev-mid{border-left-color:var(--orange-500)}
 .card.c-sev-low{border-left-color:var(--grey-400)}
@@ -360,6 +415,9 @@ ul,ol{padding-left:24px}
 .chips .tag{margin:0}
 .chips a.tag{text-decoration:none}
 .chips a.tag:hover{text-decoration:underline}
+.pq{display:inline-flex;align-items:center;font-size:var(--t6);color:var(--grey-700)}
+.related{margin-top:8px;font-size:var(--t6);color:var(--grey-700)}
+.same{margin-top:8px;font-size:var(--t6);color:var(--grey-700)}
 .done{padding:16px;border-radius:12px;background:var(--green-50);color:var(--grey-900)}
 .done h5{color:var(--green-900)}
 .reacts{margin-top:16px}
@@ -446,7 +504,7 @@ ul,ol{padding-left:24px}
 .wrap{padding:48px 20px 64px}
 h1{font-size:var(--t2)}
 .screen-head{flex-direction:column;gap:24px}
-.thumb{flex:none;width:200px;max-width:100%}
+.thumb{flex:none;width:240px;max-width:100%}
 .ab{grid-template-columns:1fr}
 .card{padding:20px}
 .stats{gap:24px}
@@ -457,36 +515,52 @@ CSS = CSS_VARS + CSS_BASE + "@media (max-width:720px){" + stack_css(".ut-table")
 
 JS = r"""
 (function(){
-var KEY=document.body.getAttribute('data-key')||'bf-cls',cls={},reveal={resolve:false,dismiss:false};
+var KEY=document.body.getAttribute('data-key')||'bf-cls',cls={};
 try{cls=JSON.parse(localStorage.getItem(KEY)||'{}')||{};}catch(e){cls={};}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(cls));}catch(e){}}
-var screens=[].slice.call(document.querySelectorAll('.screen'));
-var live=document.getElementById('live'),bar=document.getElementById('filters');
-function apply(){
-  var n={resolve:0,dismiss:0};
-  screens.forEach(function(s){var c=cls[s.getAttribute('data-sid')];if(c==='resolve'||c==='dismiss')n[c]++;});
-  ['resolve','dismiss'].forEach(function(k){
-    if(!n[k])reveal[k]=false;
-    var b=document.querySelector('[data-chip="'+k+'"]');
-    if(!b)return;
-    b.disabled=!n[k];b.setAttribute('aria-pressed',reveal[k]?'true':'false');
-    b.querySelector('b').textContent=n[k];
-  });
-  var any=reveal.resolve||reveal.dismiss,shown=0;
-  screens.forEach(function(s){
-    var c=cls[s.getAttribute('data-sid')];if(c!=='resolve'&&c!=='dismiss')c=null;
-    var show=any?!!(c&&reveal[c]):!c;
-    s.classList.toggle('hidden',!show);
-    s.classList.toggle('cls-resolve',c==='resolve');
-    s.classList.toggle('cls-dismiss',c==='dismiss');
-    if(show)shown++;
-  });
-  var e=document.getElementById('all-cleared');
-  if(e)e.classList.toggle('hidden',shown>0||!screens.length);
-  var cl=document.querySelector('.clean');if(cl)cl.classList.toggle('hidden',any);
-}
+var cards=[].slice.call(document.querySelectorAll('.card[data-fid]'));
+var live=document.getElementById('live');
 function say(m){if(live)live.textContent=m;}
-function park(){if(bar)bar.focus({preventScroll:true});}
+function state(fid){var c=cls[fid];return c==='resolve'||c==='dismiss'?c:null;}
+function apply(){
+  var n={resolve:0,dismiss:0},per={};
+  cards.forEach(function(c){
+    var st=state(c.getAttribute('data-fid'));
+    c.classList.toggle('cls-resolve',st==='resolve');
+    c.classList.toggle('cls-dismiss',st==='dismiss');
+    if(st)n[st]++;
+    var s=c.closest('.screen');
+    if(s){var k=s.getAttribute('data-sid');per[k]=per[k]||{all:0,done:0};per[k].all++;if(st)per[k].done++;}
+  });
+  ['resolve','dismiss'].forEach(function(k){var e=document.getElementById('n-'+k);if(e)e.textContent=n[k];});
+  [].forEach.call(document.querySelectorAll('.screen[data-sid] .progress'),function(e){
+    var p=per[e.closest('.screen').getAttribute('data-sid')];if(!p)return;
+    e.textContent='지적 '+p.all+'개 중 '+p.done+'개 정리'+(p.done&&p.done===p.all?' · 이 화면은 다 정리했어요':'');
+  });
+}
+function drawCrop(c){
+  var src=document.getElementById(c.getAttribute('data-img')),cv=c.querySelector('canvas');
+  if(!src||!cv||!src.naturalWidth||!src.naturalHeight)return;
+  var iw=src.naturalWidth,ih=src.naturalHeight;
+  var x=+c.getAttribute('data-x')||0,y=+c.getAttribute('data-y')||0;
+  var box=c.hasAttribute('data-w'),w=box?+c.getAttribute('data-w'):1,h=box?+c.getAttribute('data-h'):0;
+  c.style.width='';c.classList.add('ok');
+  var cw=c.clientWidth||600;   // 테두리를 뺀 카드 안 폭. 폭을 지운 뒤 재야 resize마다 커지지 않는다
+  var scale=Math.min(cw/(iw*w),2);
+  if(!h)h=Math.min(1,(cw*0.6)/(ih*scale));
+  scale=Math.min(scale,640/(ih*h));   // 너무 긴 상자는 높이 640px 안으로
+  var bx=box?x:0,by=box?y:Math.min(Math.max(y-h/2,0),1-h);
+  var dw=Math.round(iw*w*scale),dh=Math.round(ih*h*scale),r=window.devicePixelRatio||1;
+  cv.width=Math.round(dw*r);cv.height=Math.round(dh*r);cv.style.width=dw+'px';
+  c.style.width=(dw+6)+'px';   // 테두리 3px씩 포함(border-box)
+  var g=cv.getContext('2d');if(!g){c.classList.remove('ok');return;}
+  g.drawImage(src,iw*bx,ih*by,iw*w,ih*h,0,0,cv.width,cv.height);
+  var pin=c.querySelector('.pin');
+  if(pin){pin.style.left=Math.round(iw*(x-bx)*scale)+'px';pin.style.top=Math.round(ih*(y-by)*scale)+'px';}
+}
+function drawAll(){[].forEach.call(document.querySelectorAll('.crop'),drawCrop);}
+[].forEach.call(document.querySelectorAll('.pinbox img'),function(img){if(!img.complete)img.addEventListener('load',drawAll);});
+var rt;window.addEventListener('resize',function(){clearTimeout(rt);rt=setTimeout(drawAll,150);});
 function flash(b,msg){
   var old=b.getAttribute('data-label')||b.textContent;b.setAttribute('data-label',old);
   b.textContent=msg;clearTimeout(b._t);b._t=setTimeout(function(){b.textContent=old;},2000);
@@ -507,8 +581,7 @@ function copyText(text,btn,sel){
 function checklist(){
   var box=document.getElementById('cl-data'),items=[];
   try{items=JSON.parse(box.textContent)||[];}catch(e){items=[];}
-  var out=items.filter(function(it){var c=it.sid?cls[it.sid]:null;return c!=='resolve'&&c!=='dismiss';})
-    .map(function(it){return it.text;});
+  var out=items.filter(function(it){return !state(it.fid);}).map(function(it){return it.text;});
   return out.length?'## 남은 지적 '+out.length+'개\n\n'+out.join('\n'):'';
 }
 document.addEventListener('click',function(ev){
@@ -528,24 +601,15 @@ document.addEventListener('click',function(ev){
   }
   var b=ev.target.closest&&ev.target.closest('button[data-act]');
   if(b){
-    var s=b.closest('.screen');if(!s)return;
-    var sid=s.getAttribute('data-sid'),act=b.getAttribute('data-act'),nm=s.getAttribute('data-name');
-    if(act==='undo'){delete cls[sid];say(nm+' 화면을 다시 보이게 했어요');}
-    else{cls[sid]=act;say(nm+(act==='resolve'?' 화면을 해결됨으로 옮겼어요':' 화면을 문제 아님으로 옮겼어요'));}
-    save();apply();park();return;
-  }
-  var c=ev.target.closest&&ev.target.closest('button[data-chip]');
-  if(c){var k=c.getAttribute('data-chip');reveal[k]=!reveal[k];apply();return;}
-  var a=ev.target.closest&&ev.target.closest('a[href^="#"]');
-  if(a){
-    var el=document.getElementById(decodeURIComponent(a.getAttribute('href').slice(1)));
-    var sc=el&&el.closest('.screen');
-    if(sc&&sc.classList.contains('hidden')){
-      var cc=cls[sc.getAttribute('data-sid')];if(cc){reveal[cc]=true;apply();}
-    }
+    var c=b.closest('.card');if(!c)return;
+    var fid=c.getAttribute('data-fid'),act=b.getAttribute('data-act');
+    if(act==='undo'){delete cls[fid];say(fid+' 지적을 다시 열었어요');}
+    else{cls[fid]=act;say(fid+(act==='resolve'?' 지적을 고쳤어요로 표시했어요':' 지적을 문제 아님으로 표시했어요'));}
+    save();apply();
+    var nb=c.querySelector(act==='undo'?'.act-open':'.act-undo');if(nb)nb.focus();   // 누른 버튼이 숨으니 포커스를 옮긴다
   }
 });
-apply();
+apply();drawAll();
 })();
 """
 
@@ -617,7 +681,8 @@ def finding_link(m, fid):
     return f'<a href="#f-{slug(fid)}">{esc(fid)}</a>'
 
 
-def render_card(m, f, num):
+def render_card(m, f, num, img_id=None):
+    """지적 카드. img_id는 화면 썸네일 img의 id(위치 그림을 그 이미지에서 잘라 그린다). 없으면 그림 없이."""
     fid = t(f.get("id"))
     sev = f.get("severity")
     cls = SEV_VIEW.get(sev, ("sev-low",))[0]
@@ -634,8 +699,21 @@ def render_card(m, f, num):
     if ev.get("type") in ("console", "dom"):
         top.append(f'<span class="tag plain">보조 근거 · {"콘솔" if ev["type"] == "console" else "DOM"}</span>')
 
-    # 메이커가 움직이는 순서: ① 무엇이 문제인가 ② 사용자에게 생기는 일 ③ 이렇게 고쳐요 ④ 근거 ⑤ 확인 기준
+    # 시니어가 옆에서 짚어 주는 순서: 여기요(위치 그림) → 이게 문제예요 → 왜냐하면(원칙·반응) → 이렇게 해 보세요 → 이렇게 되면 끝이에요
     sid = t(f.get("screen_id"))
+    crop = ""
+    box = pin_box(f)
+    if img_id and box:
+        x, y, w, h = box
+        attrs = f'data-img="{img_id}" data-x="{x:.4f}" data-y="{y:.4f}"'
+        pin = ""
+        if w:
+            attrs += f' data-w="{w:.4f}" data-h="{h:.4f}"'
+        else:
+            pin = f'<span class="pin" aria-hidden="true">{num or ""}</span>'
+        crop = (f'<div class="crop" {attrs} role="img" aria-label="{esc(m.screen_name(sid))} 화면에서 이 지적이 가리키는 부분">'
+                f'<canvas aria-hidden="true"></canvas>{pin}</div>'
+                '<p class="crop-note">빨간 테두리 안이 이 지적이 가리키는 부분이에요</p>')
     where = ""
     if t(ev.get("where")):
         place = f'{esc(m.screen_name(sid))} · ' if sid in m.screen_by_id else ""
@@ -644,8 +722,18 @@ def render_card(m, f, num):
     p1 = f'<section class="part"><h5>무엇이 문제인가</h5>{obs}{where}</section>' if obs or where else ""
 
     why = f'<p>{esc(f.get("why"))}</p>' if t(f.get("why")) else ""
+    chips = []
+    if t(f.get("principle")):
+        q = t(m.questions.get(f["principle"]))
+        chips.append(f'<span class="tag">{esc(f.get("principle"))}</span>' + (f'<span class="pq">{esc(q)}</span>' if q else ""))
+    chips.append(case_chip(m, f))
+    chips = [c for c in chips if c]
+    chip_html = f'<div class="chips">{"".join(chips)}</div>' if chips else ""
+    rel = m.related.get(fid) or []
+    rel_html = f'<p class="related">같은 원칙에 걸린 지적: {" · ".join(finding_link(m, x) for x in rel)}</p>' if rel else ""
     reacts = render_reactions(m, fid)
-    p2 = f'<section class="part"><h5>사용자에게 생기는 일</h5>{why}{reacts}</section>' if why or reacts else ""
+    p2 = (f'<section class="part"><h5>사용자에게 생기는 일</h5>{why}{chip_html}{rel_html}{reacts}</section>'
+          if why or chip_html or reacts else "")
 
     p3 = ""
     asis, tobe = t(f.get("asis")), t(f.get("tobe"))
@@ -664,21 +752,21 @@ def render_card(m, f, num):
         fixp = f'<p>{esc(f.get("fix"))}</p>' if t(f.get("fix")) else ""
         p3 = f'<section class="part"><h5>이렇게 고쳐요</h5>{fixp}{ab}</section>'
 
-    chips = []
-    if t(f.get("principle")):
-        chips.append(f'<span class="tag">{esc(f.get("principle"))}</span>')
-    chips.append(case_chip(m, f))
-    chips = [c for c in chips if c]
-    conf = f'<p>화면만으로는 확인하지 못한 것: {esc(f.get("confirm_needed"))}</p>' if t(f.get("confirm_needed")) else ""
-    chip_html = f'<div class="chips">{"".join(chips)}</div>' if chips else ""
-    p4 = f'<section class="part"><h5>근거</h5>{chip_html}{conf}</section>' if chips or conf else ""
-
     p5 = (f'<section class="part done"><h5>고쳤는지 확인하는 기준</h5><p>{esc(f.get("done_when"))}</p></section>'
           if t(f.get("done_when")).strip() else "")
+    conf = (f'<section class="part"><h5>화면만으로 확인 못 한 것</h5><p>{esc(f.get("confirm_needed"))}</p></section>'
+            if t(f.get("confirm_needed")) else "")
+    actions = ""
+    if fid:
+        actions = ('<div class="card-actions"><span class="tag plain state state-resolve">고쳤어요</span>'
+                   '<span class="tag plain state state-dismiss">문제 아님</span>'
+                   f'<button type="button" class="btn resolve act-open" data-act="resolve" aria-label="{esc(fid)} 고쳤어요">고쳤어요</button>'
+                   f'<button type="button" class="btn act-open" data-act="dismiss" aria-label="{esc(fid)} 문제 아님">문제 아님</button>'
+                   f'<button type="button" class="btn act-undo" data-act="undo" aria-label="{esc(fid)} 되돌리기">되돌리기</button></div>')
 
     return (f'<article class="card c-{cls}" id="f-{slug(fid)}" data-fid="{esc(fid)}">'
             f'<div class="card-top">{"".join(top)}</div>'
-            f'<h4 class="title">{esc(f.get("title"))}</h4>{p1}{p2}{p3}{p4}{p5}</article>')
+            f'<h4 class="title">{esc(f.get("title"))}</h4>{crop}{p1}{p2}{p3}{p5}{conf}{actions}</article>')
 
 
 def case_chip(m, f):
@@ -698,56 +786,62 @@ def render_reactions(m, fid):
     """지적에 이어진 가상 사용자 반응을 아이콘과 한마디로. 연결된 반응이 없으면 빈 문자열."""
     if not m.ut:
         return ""
-    items = []
+    items, same = [], []
     for pid in m.ut["by_finding"].get(fid, []):
         p = m.ut["persona_by_id"].get(pid)
         if not p:
             continue
         st = m.ut["step_for"].get((fid, pid))
-        say = f'<p class="say">“{esc(st.get("quote"))}”</p>' if st and t(st.get("quote")) else ""
-        items.append(
-            f'<li class="bubble">{avatar(p.get("age_group"), True)}<div class="bub"><p class="who">'
-            f'<b><a href="#ut-p-{slug(pid)}">{esc(p.get("name"))}</a></b>'
-            f'<span>{esc(persona_line(p))}</span></p>{say}</div></li>')
-    if not items:
+        # 한 반응이 지적 여러 개에 이어지면 한마디는 첫 번째 지적에만 싣고, 나머지 카드에는 이름만 둔다(같은 인용 반복 방지)
+        primary = bool(st) and strs(st.get("finding_ids"))[:1] == [fid] and t(st.get("quote"))
+        if primary:
+            items.append(
+                f'<li class="bubble">{avatar(p.get("age_group"), True)}<div class="bub"><p class="who">'
+                f'<b><a href="#ut-p-{slug(pid)}">{esc(p.get("name"))}</a></b>'
+                f'<span>{esc(persona_line(p))}</span></p><p class="say">“{esc(st.get("quote"))}”</p></div></li>')
+        else:
+            same.append(f'<a href="#ut-p-{slug(pid)}">{esc(p.get("name"))}</a>')
+    if not items and not same:
         return ""
-    return ('<div class="reacts"><p class="vflag">가상 사용자 반응 · 실제 조사 아님</p>'
-            f'<ul class="bubbles">{"".join(items)}</ul></div>')
+    out = '<div class="reacts"><p class="vflag">가상 사용자 반응 · 실제 조사 아님</p>'
+    if items:
+        out += f'<ul class="bubbles">{"".join(items)}</ul>'
+    if same:
+        out += f'<p class="same">여기서도 막힌 사람: {", ".join(same)} (한마디는 가상 UT 표에 있어요)</p>'
+    return out + "</div>"
 
 
 def render_screen(m, run, s, items, embedded, missing):
     sid = t(s.get("id"))
     name = m.screen_name(sid)
     path = safe_shot(run, s.get("shot"))
+    img_id = f"img-{slug(sid)}"
     pins, nums = [], {}
-    for i, f in enumerate(items, 1):
-        xy = pin_xy(f)
-        if path and xy:
-            nums[id(f)] = i
-            pins.append(f'<span class="pin" aria-hidden="true" style="left:{xy[0] * 100:.1f}%;top:{xy[1] * 100:.1f}%">{i}</span>')
+    for f in items:
+        box = pin_box(f)
+        if path and box:
+            i = nums[id(f)] = len(pins) + 1   # pin이 있는 지적만 이어서 센다
+            px, py = pin_point(box)
+            pins.append(f'<span class="pin" aria-hidden="true" style="left:{px * 100:.1f}%;top:{py * 100:.1f}%">{i}</span>')
     if path:
         embedded.append(path)
-        img = (f'<span class="pinbox"><img src="{data_uri(path)}" alt="{esc(name)} 화면 시안">'
-               f'{"".join(pins)}</span>')
+        img = (f'<span class="pinbox"><span class="pinin"><img src="{data_uri(path)}" alt="{esc(name)} 화면 시안" id="{img_id}">'
+               f'{"".join(pins)}</span></span>')
     else:
         missing.append(name)
         img = '<div class="noimg">이미지를 불러오지 못했어요</div>'
-    cards = "".join(render_card(m, f, nums.get(id(f))) for f in items)
+        img_id = None
+    cards = "".join(render_card(m, f, nums.get(id(f)), img_id) for f in items)
     sub = []
     if t(s.get("screen_goal")):
         sub.append(f'<p class="sub">화면 목표: {esc(s.get("screen_goal"))}</p>')
     if t(s.get("verdict")):
         sub.append(f'<p>{esc(s.get("verdict"))}</p>')
+    sub.append(f'<p class="progress">지적 {len(items)}개</p>')
     return (f'<article class="screen" id="sec-{slug(sid)}" data-sid="{esc(slug(sid))}" data-name="{esc(name)}">'
             f'<div class="screen-head"><div class="thumb">{img}</div>'
-            f'<div class="screen-info"><h3>{esc(name)}</h3>{"".join(sub)}'
-            f'<div class="actions when-open">'
-            f'<button type="button" class="btn resolve" data-act="resolve">문제를 해결했어요</button>'
-            f'<button type="button" class="btn" data-act="dismiss">문제가 아니에요</button></div>'
-            f'<div class="actions when-done"><span class="tag plain"><span class="done-resolve">해결했어요</span>'
-            f'<span class="done-dismiss">문제가 아니라고 했어요</span></span>'
-            f'<button type="button" class="btn" data-act="undo">되돌리기</button></div>'
-            f'</div></div><div class="cards">{cards}</div></article>')
+            f'<div class="screen-info"><h3>{esc(name)}</h3>{"".join(sub)}</div></div>'
+            f'<div class="cards">{cards}</div></article>')
 
 
 def render_ut(m):
@@ -835,23 +929,28 @@ def build_html(m, run):
     key_src = headline + "|" + ",".join(sorted(m.finding_by_id)) + "|" + ",".join(sorted(m.screen_by_id))
     key = "bf-cls-" + hashlib.sha1(key_src.encode("utf-8")).hexdigest()[:10]
 
+    # 검토 전제는 접어 두고(메이커가 먼저 볼 것은 지적), 같은 뜻의 줄은 하나만 둔다
     meta = []
     src = m.cap.get("source") if isinstance(m.cap.get("source"), dict) else {}
     if t(src.get("name")):
         meta.append(("검토 대상", esc(src.get("name"))))
-    meta.append(("입력 방식", esc(label_of(INPUT_LABEL, m.run.get("input_type")) or "알 수 없음")))
-    meta.append(("문구 판정 방식", esc(label_of(WRITING_LABEL, m.run.get("writing_judge")) or "알 수 없음")))
     if t(m.run.get("product_value")):
         meta.append(("제품 핵심 가치", esc(m.run.get("product_value"))))
-    if t(m.run.get("goal")):
-        meta.append(("검토 목표", esc(m.run.get("goal"))))
     brief = m.run.get("brief") if isinstance(m.run.get("brief"), dict) else {}
+    if t(m.run.get("goal")) and not t(brief.get("objective")):
+        meta.append(("검토 목표", esc(m.run.get("goal"))))
     for k, label in BRIEF_FIELDS:
         if t(brief.get(k)):
             meta.append((label, esc(brief.get(k))))
-    if brief.get("source") in ("inferred", "mixed"):
-        meta.append(("맥락 출처", "일부나 전부를 화면에서 추론했어요"))
+    if brief.get("source") == "inferred":
+        meta.append(("맥락 출처", "전부 화면에서 추론했어요"))
+    elif brief.get("source") == "mixed":
+        meta.append(("맥락 출처", "일부 항목은 화면에서 추론했어요"))
     meta_html = "".join(f"<div><dt>{k}</dt><dd>{v}</dd></div>" for k, v in meta)
+    meta_wrap = (f'<details class="meta-wrap"><summary>검토 전제 보기</summary><dl class="meta">{meta_html}</dl></details>'
+                 if meta else "")
+    foot_meta = (f'<p class="foot-meta">입력 {esc(label_of(INPUT_LABEL, m.run.get("input_type")) or "알 수 없음")} · '
+                 f'문구 판정 {esc(label_of(WRITING_LABEL, m.run.get("writing_judge")) or "알 수 없음")}</p>')
 
     top = []
     for f in top_findings(m):
@@ -884,29 +983,24 @@ def build_html(m, run):
     if m.strengths:
         jumps.append('<a href="#strengths">잘 된 점</a>')
     if m.checks:
-        jumps.append('<a href="#checks">확인 필요</a>')
+        jumps.append('<a href="#checks">답해 주실 것</a>')
     jump_html = f'<nav class="jump" aria-label="리포트 목차">{"".join(jumps)}</nav>' if jumps else ""
 
-    filters = ('<div class="filters" id="filters" tabindex="-1" role="group" aria-label="정리한 화면 보기">'
-               '<span class="flabel">정리한 화면</span>'
-               '<button type="button" class="chipbtn" data-chip="resolve" aria-pressed="false" disabled>해결됨<b>0</b></button>'
-               '<button type="button" class="chipbtn" data-chip="dismiss" aria-pressed="false" disabled>문제 아님<b>0</b></button>'
-               '</div>') if shown_screens else ""
-
+    progress = ('<li>고쳤어요 <b id="n-resolve">0</b>개</li><li>문제 아님 <b id="n-dismiss">0</b>개</li>'
+                if m.findings else "")
     header = (f'<header class="hero"><p class="kicker">UX 검토 결과</p><h1>{esc(headline)}</h1>'
               f'{top_html}{tools_html}'
               f'<ul class="stats"><li>화면 <b>{n_screens}</b>개</li><li>지적 <b>{n_find}</b>개</li>'
-              f'<li>심각 <b>{n_sev}</b>개</li></ul>'
-              f'<dl class="meta">{meta_html}</dl>{jump_html}{filters}</header>')
+              f'<li>심각 <b>{n_sev}</b>개</li>{progress}</ul>'
+              f'{meta_wrap}{jump_html}</header>')
 
     parts = [header]
 
     if shown_screens:
         sec = ['<section class="block" id="screens" aria-labelledby="h-screens"><h2 id="h-screens">화면별 지적</h2>'
-               '<p class="lead">화면마다 심각한 것부터 보여요. 정리한 화면은 숨기고, 이 브라우저에만 기억해요.</p>']
+               '<p class="lead">화면마다 심각한 것부터, 같은 종류끼리 모아 보여요. 지적마다 고쳤어요를 누르면 접히고, 이 브라우저에만 기억해요.</p>']
         for s in shown_screens:
             sec.append(render_screen(m, run, s, m.by_screen[t(s.get("id"))], embedded, missing))
-        sec.append('<p class="empty hidden" id="all-cleared">모든 화면을 정리했어요. 위 칩을 눌러 다시 볼 수 있어요.</p>')
         clean = [m.screen_name(t(s.get("id"))) for s in m.screens if not m.by_screen.get(t(s.get("id")))]
         if clean:
             sec.append(f'<p class="clean"><b>화면 안 지적이 없는 화면 {len(clean)}개</b> · {esc(" · ".join(clean))}</p>')
@@ -947,9 +1041,10 @@ def build_html(m, run):
 
     if m.checks:
         items = "".join(f"<div><dt>{esc(c.get('what'))}</dt><dd>{esc(c.get('how'))}</dd></div>" for c in m.checks)
-        parts.append('<section class="block" id="checks" aria-labelledby="h-chk"><h2 id="h-chk">확인 필요</h2>'
-                     '<p class="lead">화면만으로는 알 수 없어서 남겨 둔 것이에요.</p>'
+        parts.append('<section class="block" id="checks" aria-labelledby="h-chk"><h2 id="h-chk">답해 주시면 더 정확해져요</h2>'
+                     '<p class="lead">화면만으로는 알 수 없었어요. 답을 주시면 그 지적을 다시 판정해요.</p>'
                      f'<dl class="checks">{items}</dl></section>')
+    parts.append(foot_meta)
 
     doc = ('<!doctype html><html lang="ko"><head><meta charset="utf-8">'
            '<meta http-equiv="Content-Security-Policy" content="' + CSP + '">'
@@ -983,9 +1078,9 @@ def code(v):
 
 def checklist_items(m):
     """남은 지적 체크리스트 항목을 심각도 순으로. sid는 화면 섹션 키(slug), 흐름 지적은 빈 문자열.
-    HTML의 [남은 지적을 체크리스트로 복사]가 이 목록에서 해결됨·문제 아님 화면의 항목을 빼요."""
+    HTML의 [남은 지적을 체크리스트로 복사]가 이 목록에서 고쳤어요·문제 아님으로 표시한 지적(fid)을 빼요."""
     items = []
-    for f in sorted(m.findings, key=sev_key):
+    for f in sorted(m.findings, key=order_key):
         fid = t(f.get("id"))
         sid = t(f.get("screen_id"))
         in_screen = f.get("lens") != "흐름" and bool(sid)
@@ -998,9 +1093,9 @@ def checklist_items(m):
     return items
 
 
-def render_checklist(items, skip_sids=()):
-    """체크리스트 마크다운. skip_sids에 든 화면의 항목은 뺀다. 남은 것이 없으면 빈 문자열."""
-    kept = [it["text"] for it in items if not (it["sid"] and it["sid"] in skip_sids)]
+def render_checklist(items, skip_fids=()):
+    """체크리스트 마크다운. skip_fids에 든 지적은 뺀다. 남은 것이 없으면 빈 문자열."""
+    kept = [it["text"] for it in items if it["fid"] not in skip_fids]
     if not kept:
         return ""
     return f"## 남은 지적 {len(kept)}개\n\n" + "\n".join(kept)
@@ -1038,7 +1133,7 @@ def build_md(m):
               f"- 화면 목표: {mt(s.get('screen_goal'))}", f"- 한 줄 진단: {mt(s.get('verdict'))}"]
 
     L += ["", "## 지적"]
-    for f in sorted(m.findings, key=sev_key):
+    for f in sorted(m.findings, key=order_key):
         L += ["", f"### [{mt(f.get('severity'))}] {mt(f.get('id'))} {mt(f.get('title'))}  (렌즈: {mt(f.get('lens'))})"]
         ev = f.get("evidence") if isinstance(f.get("evidence"), dict) else {}
         sid = t(f.get("screen_id"))
@@ -1049,7 +1144,8 @@ def build_md(m):
             if t(f.get(key)):
                 L.append(f"- {label}: {mt(f.get(key))}")
         if t(f.get("principle")):
-            L.append(f"- 근거 원칙: {mt(f.get('principle'))} {mt(f.get('case'))}".rstrip())
+            q = mt(m.questions.get(f["principle"]))
+            L.append(f"- 근거 원칙: {mt(f.get('principle'))} {mt(f.get('case'))}".rstrip() + (f" · {q}" if q else ""))
         for label, key in (("제안", "fix"), ("수정 전", "asis"), ("수정 후", "tobe"),
                            ("고쳤는지 확인하는 기준", "done_when"), ("확인 필요", "confirm_needed")):
             if t(f.get(key)):
@@ -1102,7 +1198,7 @@ def build_md(m):
             tail = ", ".join(x for x in (mt(st.get("principle")), mt(st.get("screen_id"))) if x)
             L.append(f"- {mt(st.get('note'))}" + (f" ({tail})" if tail else ""))
     if m.checks:
-        L += ["", "## 확인 필요"]
+        L += ["", "## 답해 주시면 더 정확해져요 (확인 필요)"]
         for c in m.checks:
             L.append(f"- {mt(c.get('what'))}: {mt(c.get('how'))}")
     cl = render_checklist(checklist_items(m))

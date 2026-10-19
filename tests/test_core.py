@@ -55,6 +55,7 @@ def good_review():
             "fix": "버튼을 키보드 위에 고정해요.", "tobe": "키보드 위에 '저장하기'를 고정해요.",
             "done_when": "키보드를 연 상태에서도 '저장하기'가 화면에 보여요.",
             "evidence": {"shot": "shots/home.png", "where": "화면 하단", "type": "shot"},
+            "pin": {"x": 0.5, "y": 0.9},
         }],
         "strengths": [],
         "checks_needed": [],
@@ -311,6 +312,33 @@ class ValidateTest(RunCase):
         self.assertEqual(self.run_check(rev)[1], [])
         rev["findings"][0]["why"] = "버튼의 금액이 화면마다 달라요."
         self.assertTrue(any("dummy-amount-mismatch" in w for w in self.run_check(rev)[1]))
+
+    def test_pin_is_optional_but_warned(self):
+        rev = good_review()
+        self.assertFalse(any("pin" in w for w in self.run_check(rev)[1]))
+        del rev["findings"][0]["pin"]
+        self.assertTrue(any("pin이 없어" in w for w in self.run_check(rev)[1]))
+        rev["findings"][0]["pin"] = {"x": 1.5, "y": 0.2}
+        warns = self.run_check(rev)[1]
+        self.assertTrue(any("pin은" in w for w in warns))
+        self.assertEqual(self.run_check(rev)[0], [])   # 경고일 뿐 오류는 아니에요
+        rev["findings"][0]["pin"] = {"x": 0.1, "y": 0.2, "w": 0.5, "h": 0}
+        self.assertTrue(any("pin은" in w for w in self.run_check(rev)[1]))
+        rev["findings"][0]["pin"] = {"x": 0.1, "y": 0.2, "w": 0.5}   # w, h는 함께
+        self.assertTrue(any("pin은" in w for w in self.run_check(rev)[1]))
+        rev["findings"][0]["pin"] = {"x": 0.8, "y": 0.8, "w": 0.5, "h": 0.5}
+        self.assertTrue(any("이미지 밖" in w for w in self.run_check(rev)[1]))
+
+    def test_pin_box_clamps_and_rejects_bad_values(self):
+        pb = build_report.pin_box
+        self.assertEqual(pb({"pin": {"x": 0.8, "y": 0.8, "w": 0.5, "h": 0.5}}), (0.8, 0.8, 0.2, 0.2))
+        self.assertEqual(pb({"pin": {"x": 0.3, "y": 0.4}}), (0.3, 0.4, None, None))
+        self.assertEqual(pb({"pin": {"x": 0.3, "y": 0.4, "w": 0.5}}), (0.3, 0.4, None, None))   # 한쪽만 있으면 점
+        self.assertEqual(pb({"pin": {"x": 1.0, "y": 0.4, "w": 0.5, "h": 0.5}})[2:], (None, None))   # 남는 폭이 0이면 점
+        for bad in ({"x": "a", "y": 0.1}, {"x": True, "y": 0.1}, {"x": float("nan"), "y": 0.1}, "x", None):
+            self.assertIsNone(pb({"pin": bad}), repr(bad))
+        self.assertEqual(build_report.pin_point((0.2, 0.2, 0.4, 0.2)), (0.4, 0.3))
+        self.assertEqual(build_report.pin_point((0.2, 0.2, None, None)), (0.2, 0.2))
 
     def test_asis_must_appear_in_aux_text_when_available(self):
         rev = good_review()
@@ -695,7 +723,9 @@ class ReportTest(RunCase):
         build_report.build(self.run_dir, "html")
         doc = self.read("report.html")
         self.assertIn("data:image/png;base64,", doc)
-        self.assertRegex(doc, r'<img src="data:image/png;base64,[A-Za-z0-9+/=]+" alt="홈 화면 시안">')
+        self.assertRegex(doc, r'<img src="data:image/png;base64,[A-Za-z0-9+/=]+" alt="홈 화면 시안" id="img-home">')
+        # 이미지는 한 번만 들어가고, 지적 카드의 위치 그림은 그 이미지에서 canvas로 그려요
+        self.assertEqual(doc.count("data:image/png;base64,"), 1)
         self.assertIsNone(re.search(r'(src|href|action)\s*=\s*"(https?:)?//', doc))
         self.assertNotIn("@import", doc)
         self.assertNotIn("url(http", doc)
@@ -788,16 +818,59 @@ class ReportTest(RunCase):
         self.assertIn('id="f-F01"', doc)
         self.assertIn('id="ut-p-p-senior-dlo-ulo"', doc)
 
-    def test_classify_buttons_are_native_and_filters_exist(self):
+    def test_classify_buttons_are_per_finding_and_native(self):
         self.put_review(good_review())
         build_report.build(self.run_dir, "html")
         doc = self.read("report.html")
-        for label in ("문제를 해결했어요", "문제가 아니에요", "되돌리기"):
-            self.assertRegex(doc, r'<button type="button"[^>]*>' + label + "</button>")
-        self.assertIn('data-chip="resolve"', doc)
-        self.assertIn('data-chip="dismiss"', doc)
+        card = doc.split('id="f-F01"')[1].split("</article>")[0]
+        for label in ("고쳤어요", "문제 아님", "되돌리기"):
+            self.assertRegex(card, r'<button type="button"[^>]*data-act="[a-z]+"[^>]*>' + label + "</button>")
+        self.assertNotIn("data-chip", doc)
+        self.assertNotIn("문제를 해결했어요", doc)
+        self.assertIn('id="n-resolve"', doc)
+        self.assertIn('class="progress"', doc)
         self.assertIn("localStorage", doc)
         self.assertIn("prefers-reduced-motion", doc)
+
+    def test_pin_crop_quote_dedupe_and_collapsed_premise(self):
+        rev = self.ut_review()
+        rev["checks_needed"] = [{"what": "정책", "how": "문서를 봐요"}]
+        rev["findings"][0]["pin"] = {"x": 0.1, "y": 0.8, "w": 0.8, "h": 0.1}
+        f2 = copy.deepcopy(rev["findings"][0])
+        f2.update({"id": "F02", "severity": "중간", "title": "버튼 이름이 모호해요", "pin": {"x": 0.5, "y": 0.5},
+                   "from_ut": []})
+        rev["findings"].append(f2)
+        rev["ut"]["walks"][0]["steps"][0]["finding_ids"] = ["F01", "F02"]
+        self.put_review(rev)
+        build_report.build(self.run_dir, "html")
+        doc = self.read("report.html")
+        c1 = doc.split('id="f-F01"')[1].split("</article>")[0]
+        c2 = doc.split('id="f-F02"')[1].split("</article>")[0]
+        # 위치 그림: 상자는 data-w/h, 점은 번호 핀. 둘 다 canvas로 그려요
+        self.assertIn('class="crop" data-img="img-home" data-x="0.1000" data-y="0.8000" data-w="0.8000" data-h="0.1000"', c1)
+        self.assertIn("<canvas", c1)
+        # 썸네일 핀 번호와 카드 번호가 같고, pin 있는 지적만 이어서 센다
+        self.assertIn('<span class="num" aria-hidden="true">1</span>', c1)
+        self.assertIn('<span class="num" aria-hidden="true">2</span>', c2)
+        self.assertEqual(doc.count('class="pin" aria-hidden="true" style='), 2)
+        self.assertIn('data-x="0.5000" data-y="0.5000"', c2)
+        self.assertNotIn("data-w", c2)
+        self.assertIn('class="pin"', c2)
+        # 같은 한마디는 첫 번째로 이어진 지적(F01)에만, F02에는 이름만
+        self.assertIn("저장은 어디서 하는 거예요?", c1)
+        self.assertNotIn("저장은 어디서 하는 거예요?", c2)
+        self.assertIn("여기서도 막힌 사람", c2)
+        self.assertEqual(doc.count("저장은 어디서 하는 거예요?"), 2)   # F01 카드 + 가상 UT 표
+        # 원칙 칩 옆 검토 질문, 같은 원칙끼리 연결
+        self.assertIn("완료에 필요한 행동이 한눈에 보이는가?", c1)
+        self.assertIn('같은 원칙에 걸린 지적: <a href="#f-F02">F02</a>', c1)
+        # 검토 전제는 접혀 있고, 입력·판정 방식은 맨 아래 한 줄
+        self.assertIn('<details class="meta-wrap"><summary>검토 전제 보기</summary>', doc)
+        self.assertLess(doc.index('class="foot-meta"'), doc.index("<script>"))
+        self.assertNotIn("<dt>입력 방식</dt>", doc)
+        self.assertNotIn("<dt>검토 목표</dt>", doc)   # 브리프 목표가 있으면 run.goal 줄은 빼요
+        self.assertIn("답해 주시면 더 정확해져요", doc)
+        self.assertNotIn("<h5>근거</h5>", doc)
 
     def test_missing_review_json_is_a_clean_error(self):
         with self.assertRaises(ValueError):
@@ -829,10 +902,10 @@ class ReportTest(RunCase):
         self.assertIn("- [ ] [심각] F01 저장 버튼이 가려져요 (홈)", md)
         self.assertIn("  - 확인 기준: 키보드가 올라와도 '저장하기'가 보여요.", md)
         self.assertIn("- [ ] [중간] F02 수정하는 길이 없어요 (여러 화면에 걸친 흐름)", md)
-        cleared = build_report.render_checklist(items, skip_sids={"home"})
+        cleared = build_report.render_checklist(items, skip_fids={"F01"})
         self.assertNotIn("F01", cleared)
         self.assertIn("F02", cleared)
-        self.assertEqual(build_report.render_checklist(items, skip_sids={"home"}).count("- [ ]"), 1)
+        self.assertEqual(build_report.render_checklist(items, skip_fids={"F01"}).count("- [ ]"), 1)
         self.put_review(rev)
         build_report.build(self.run_dir, "md")
         report = self.read("report.md")
@@ -893,8 +966,8 @@ class ReportTest(RunCase):
         build_report.build(self.run_dir, "html")
         doc = self.read("report.html")
         card = doc.split('id="f-F01"')[1]
-        order = [card.index(x) for x in ("무엇이 문제인가", "사용자에게 생기는 일", "이렇게 고쳐요", "<h5>근거</h5>",
-                                         "고쳤는지 확인하는 기준")]
+        order = [card.index(x) for x in ('class="crop"', "무엇이 문제인가", "사용자에게 생기는 일", "Clear Action",
+                                         "이렇게 고쳐요", "고쳤는지 확인하는 기준", 'class="card-actions"')]
         self.assertEqual(order, sorted(order))
         self.assertIn("화면 위치", card)
         self.assertIn('href="https://toss.im/simplicity/sessions/when-ux-ignores-blind-users"', card)

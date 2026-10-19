@@ -523,6 +523,22 @@ def check(rev, cap, run, principles, cases):
         elif sev == "심각" and blank(dw):
             warns.append(f"{tag}: 심각 지적에는 done_when(고쳤는지 확인하는 기준 한두 줄)을 권해요")
 
+        # 위치 핀(선택): 지적 카드의 위치 그림과 화면 썸네일 번호에 쓴다
+        pin = f.get("pin")
+        if pin is not None:
+            def ratio(v, positive=False):
+                return (isinstance(v, (int, float)) and not isinstance(v, bool)
+                        and (0 < v <= 1 if positive else 0 <= v <= 1))
+            ok = (isinstance(pin, dict) and ratio(pin.get("x")) and ratio(pin.get("y"))
+                  and all(pin.get(k) is None or ratio(pin.get(k), True) for k in ("w", "h"))
+                  and (pin.get("w") is None) == (pin.get("h") is None))
+            if not ok:
+                warns.append(f"{tag}: pin은 {{x, y[, w, h]}} 0~1 비율 숫자여야 해요(w, h는 함께). 틀리면 위치 그림이 빠져요")
+            elif pin.get("w") is not None and (pin["x"] + pin["w"] > 1 or pin["y"] + pin["h"] > 1):
+                warns.append(f"{tag}: pin 상자가 이미지 밖으로 나가요(x+w, y+h는 1 이하). 넘치는 부분은 잘려요")
+        elif isinstance(sid, str) and lens != "흐름":
+            warns.append(f"{tag}: pin이 없어 지적 카드에 위치 그림이 안 들어가요. evidence 위치를 {{x, y, w, h}} 비율로 적으세요")
+
         # 부재 주장은 훑은 흔적이 있어야 한다(휴리스틱)
         if sev == "심각" and ABSENCE_CLAIM.search(f"{f.get('title') or ''} {f.get('observation') or ''}"):
             trail = f"{f.get('observation') or ''} {f.get('confirm_needed') or ''}"
